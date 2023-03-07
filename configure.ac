@@ -105,6 +105,8 @@ AC_SUBST(LIBTORRENT_CFLAGS)
 
 AC_DEFINE(HAVE_CONFIG_H, 1, true if config.h was included)
 
+AC_CHECK_HEADERS([resolv.h])
+
 CC_ATTRIBUTE_UNUSED(
   AC_DEFINE([__UNUSED], [__attribute__((unused))], [Wrapper around unused attribute]),
   AC_DEFINE([__UNUSED], [], [Null-wrapper if unused attribute is unsupported])

@@ -38,6 +38,10 @@
 
 #include <sys/types.h>
 
+#ifdef HAVE_RESOLV_H
+#include <resolv.h>
+#endif
+
 #include <rak/address_info.h>
 #include <rak/socket_address.h>
 
@@ -52,7 +56,7 @@ namespace torrent {
 
 // Fix TrackerUdp, etc, if this is made async.
 static ConnectionManager::slot_resolver_result_type*
-resolve_host(const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
+resolve_host_system(const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
   if (manager->main_thread_main()->is_current())
     thread_base::release_global_lock();
 
@@ -77,6 +81,41 @@ resolve_host(const char* host, int family, int socktype, ConnectionManager::slot
   slot(sa.c_sockaddr(), 0);
   return NULL;
 }
+
+#ifdef HAVE_RESOLV_H
+static ConnectionManager::slot_resolver_result_type*
+resolve_host_custom(const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
+  unsigned char response[NS_PACKETSZ];
+  // TODO ipv6 / T_AAAA ?
+  const int len = res_nquery(&_res, host, C_IN, T_A, response, sizeof(response));
+  if (len > -1) {
+    ns_msg handle;
+    if (ns_initparse(response, len, &handle) > -1) {
+      for (int i_msg = 0; i_msg < ns_msg_count(handle, ns_s_an); ++i_msg) {
+        ns_rr rr;
+        if (ns_parserr(&handle, ns_s_an, i_msg, &rr) == 0) {
+          if (ns_rr_type(rr) == ns_t_a) {
+            if (rr.rdlength != 4) {
+              fprintf(stderr, "unexpected rd length [%u]\n", rr.rdlength);
+              throw internal_error("Invalid rd length.");
+            }
+            const int address = ns_get32(rr.rdata);
+            struct sockaddr_in sin;
+            memset(&sin, 0x00, sizeof(sin));
+            sin.sin_addr.s_addr = address;
+            sin.sin_family = AF_INET;
+            slot(reinterpret_cast<const struct sockaddr *>(&sin), 0);
+            return nullptr;
+          }
+        }
+      }
+    }
+  }
+
+  slot(nullptr, errno);
+  return nullptr;
+}
+#endif
 
 ConnectionManager::ConnectionManager() :
   m_size(0),
@@ -103,7 +142,7 @@ ConnectionManager::ConnectionManager() :
   rak::socket_address::cast_from(m_localAddress)->clear();
   rak::socket_address::cast_from(m_proxyAddress)->clear();
 
-  m_slot_resolver = std::bind(&resolve_host,
+  m_slot_resolver = std::bind(&resolve_host_system,
                               std::placeholders::_1,
                               std::placeholders::_2,
                               std::placeholders::_3,
@@ -150,6 +189,38 @@ ConnectionManager::set_bind_address(const sockaddr* sa) {
     throw input_error("Tried to set a bind address that is not an af_inet address.");
 
   rak::socket_address::cast_from(m_bindAddress)->copy(*rsa, rsa->length());
+}
+
+void
+ConnectionManager::dns_server_set(const sockaddr* sa) {
+#ifdef HAVE_RESOLV_H
+  if (sa && sa->sa_family != AF_INET) {
+      throw input_error("Tried to set a custom dns server that is not ipv4.");
+  }
+
+  const int r = res_ninit(&_res);
+  if (r != 0) {
+    fprintf(stderr, "Failed to res_init, error code: [%d]", r);
+    throw internal_error("Failed to res_init.");
+  }
+
+  sockaddr_in sin;
+  memcpy(&sin, sa, sizeof(sockaddr_in));
+  if (sin.sin_port == 0) {
+    sin.sin_port = htons(53);
+  }
+
+  memcpy(&_res.nsaddr_list[0], &sin, sizeof(sockaddr_in));
+  _res.nscount = 1;
+
+  m_slot_resolver = std::bind(&resolve_host_custom,
+                              std::placeholders::_1,
+                              std::placeholders::_2,
+                              std::placeholders::_3,
+                              std::placeholders::_4);
+#else
+  throw internal_error("Can't set custom DNS server, it was compiled out.");
+#endif
 }
 
 void

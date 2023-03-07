@@ -140,6 +140,8 @@ public:
   void                set_local_address(const sockaddr* sa);
   void                set_proxy_address(const sockaddr* sa);
 
+  void                dns_server_set(const sockaddr* sa);
+
   uint32_t            filter(const sockaddr* sa);
   void                set_filter(const slot_filter_type& s)   { m_slot_filter = s; }
 
