@@ -695,7 +695,7 @@ DhtServer::failed_transaction(transaction_itr itr, bool quick) {
   } else {
     drop_packet(transaction->packet());
     delete itr->second;
-    m_transactions.erase(itr++);
+    itr = m_transactions.erase(itr);
     return itr;
   }
 }

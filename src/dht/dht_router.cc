@@ -482,7 +482,7 @@ DhtRouter::receive_timeout() {
 
     if (itr.tracker()->empty()) {
       delete itr.tracker();
-      m_trackers.erase(itr++);
+      itr = m_trackers.erase(itr);
 
     } else {
       ++itr;

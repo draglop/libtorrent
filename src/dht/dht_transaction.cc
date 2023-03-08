@@ -150,7 +150,7 @@ DhtSearch::trim(bool final) {
     // currently being contacted.
     if (!itr.node()->is_active() && needClosest <= 0 && (!itr.node()->is_good() || needGood <= 0)) {
       delete itr.node();
-      erase(itr++);
+      itr = erase(itr);
       continue;
     }
 
