@@ -33,7 +33,7 @@ ResourceManager::ResourceManager() :
 {
 }
 
-ResourceManager::~ResourceManager() {
+ResourceManager::~ResourceManager() noexcept(false) {
   if (m_currentlyUploadUnchoked != 0)
     throw internal_error("ResourceManager::~ResourceManager() called but m_currentlyUploadUnchoked != 0.");
 
@@ -60,7 +60,7 @@ ResourceManager::insert(const resource_manager_entry& entry) {
     choke_base_type::iterator group_itr = choke_base_type::begin() + itr->group();
     (*group_itr)->set_last((*group_itr)->last() + 1);
 
-    std::for_each(++group_itr, choke_base_type::end(), std::mem_fun(&choke_group::inc_iterators));
+    std::for_each(++group_itr, choke_base_type::end(), std::mem_fn(&choke_group::inc_iterators));
   }
 
   choke_queue::move_connections(NULL, group_at(entry.group())->up_queue(), download, download->up_group_entry());
@@ -77,7 +77,7 @@ ResourceManager::update_group_iterators() {
   while (group_itr != choke_base_type::end()) {
     (*group_itr)->set_first(&*entry_itr);
     entry_itr = std::find_if(entry_itr, end(), rak::less(std::distance(choke_base_type::begin(), group_itr),
-                                                         std::mem_fun_ref(&value_type::group)));
+                                                         std::bind(&value_type::group, std::placeholders::_1)));
     (*group_itr)->set_last(&*entry_itr);
     group_itr++;
   }
@@ -93,7 +93,7 @@ ResourceManager::validate_group_iterators() {
       throw internal_error("ResourceManager::receive_tick() invalid first iterator.");
 
     entry_itr = std::find_if(entry_itr, end(), rak::less(std::distance(choke_base_type::begin(), group_itr),
-                                                         std::mem_fun_ref(&value_type::group)));
+                                                         std::bind(&value_type::group, std::placeholders::_1)));
     if ((*group_itr)->last() != &*entry_itr)
       throw internal_error("ResourceManager::receive_tick() invalid last iterator.");
 
@@ -103,7 +103,7 @@ ResourceManager::validate_group_iterators() {
 
 void
 ResourceManager::erase(DownloadMain* d) {
-  iterator itr = std::find_if(begin(), end(), rak::equal(d, std::mem_fun_ref(&value_type::download)));
+  iterator itr = std::find_if(begin(), end(), rak::equal(d, std::bind(&value_type::download, std::placeholders::_1)));
 
   if (itr == end())
     throw internal_error("ResourceManager::erase() itr == end().");
@@ -114,7 +114,7 @@ ResourceManager::erase(DownloadMain* d) {
   choke_base_type::iterator group_itr = choke_base_type::begin() + itr->group();
   (*group_itr)->set_last((*group_itr)->last() - 1);
 
-  std::for_each(++group_itr, choke_base_type::end(), std::mem_fun(&choke_group::dec_iterators));
+  std::for_each(++group_itr, choke_base_type::end(), std::mem_fn(&choke_group::dec_iterators));
 
   base_type::erase(itr);
 }
@@ -123,7 +123,7 @@ void
 ResourceManager::push_group(const std::string& name) {
   if (name.empty() ||
       std::find_if(choke_base_type::begin(), choke_base_type::end(),
-                   rak::equal(name, std::mem_fun(&choke_group::name))) != choke_base_type::end())
+                   rak::equal(name, std::mem_fn(&choke_group::name))) != choke_base_type::end())
     throw input_error("Duplicate name for choke group.");
 
   choke_base_type::push_back(new choke_group());
@@ -145,12 +145,12 @@ ResourceManager::push_group(const std::string& name) {
 
 ResourceManager::iterator
 ResourceManager::find(DownloadMain* d) {
-  return std::find_if(begin(), end(), rak::equal(d, std::mem_fun_ref(&value_type::download)));
+  return std::find_if(begin(), end(), rak::equal(d, std::bind(&value_type::download, std::placeholders::_1)));
 }
 
 ResourceManager::iterator
 ResourceManager::find_throw(DownloadMain* d) {
-  iterator itr = std::find_if(begin(), end(), rak::equal(d, std::mem_fun_ref(&value_type::download)));
+  iterator itr = std::find_if(begin(), end(), rak::equal(d, std::bind(&value_type::download, std::placeholders::_1)));
 
   if (itr == end())
     throw input_error("Could not find download in resource manager.");
@@ -160,7 +160,7 @@ ResourceManager::find_throw(DownloadMain* d) {
 
 ResourceManager::iterator
 ResourceManager::find_group_end(uint16_t group) {
-  return std::find_if(begin(), end(), rak::less(group, std::mem_fun_ref(&value_type::group)));
+  return std::find_if(begin(), end(), rak::less(group, std::bind(&value_type::group, std::placeholders::_1)));
 }
 
 choke_group*
@@ -174,7 +174,7 @@ ResourceManager::group_at(uint16_t grp) {
 choke_group*
 ResourceManager::group_at_name(const std::string& name) {
   choke_base_type::iterator itr = std::find_if(choke_base_type::begin(), choke_base_type::end(),
-                                               rak::equal(name, std::mem_fun(&choke_group::name)));
+                                               rak::equal(name, std::mem_fn(&choke_group::name)));
 
   if (itr == choke_base_type::end())
     throw input_error("Choke group not found.");
@@ -185,7 +185,7 @@ ResourceManager::group_at_name(const std::string& name) {
 int
 ResourceManager::group_index_of(const std::string& name) {
   choke_base_type::iterator itr = std::find_if(choke_base_type::begin(), choke_base_type::end(),
-                                               rak::equal(name, std::mem_fun(&choke_group::name)));
+                                               rak::equal(name, std::mem_fn(&choke_group::name)));
 
   if (itr == choke_base_type::end())
     throw input_error("Choke group not found.");
@@ -225,11 +225,11 @@ ResourceManager::set_group(iterator itr, uint16_t grp) {
   // not the same, so no need to check for that.
   if (group_dest < group_src) {
     (*group_dest)->set_last((*group_dest)->last() + 1);
-    std::for_each(++group_dest, group_src, std::mem_fun(&choke_group::inc_iterators));
+    std::for_each(++group_dest, group_src, std::mem_fn(&choke_group::inc_iterators));
     (*group_src)->set_first((*group_src)->first() + 1);
   } else {
     (*group_src)->set_last((*group_src)->last() - 1);
-    std::for_each(++group_src, group_dest, std::mem_fun(&choke_group::dec_iterators));
+    std::for_each(++group_src, group_dest, std::mem_fn(&choke_group::dec_iterators));
     (*group_dest)->set_first((*group_dest)->first() - 1);
   }
 }
@@ -313,7 +313,7 @@ ResourceManager::receive_tick() {
 unsigned int
 ResourceManager::total_weight() const {
   // TODO: This doesn't take into account inactive downloads.
-  return std::for_each(begin(), end(), rak::accumulate((unsigned int)0, std::mem_fun_ref(&value_type::priority))).result;
+  return std::for_each(begin(), end(), rak::accumulate((unsigned int)0, std::bind(&value_type::priority, std::placeholders::_1))).result;
 }
 
 int

@@ -171,7 +171,7 @@ less(Type t, Ftor f) {
 }
 
 template <typename FtorA, typename FtorB>
-struct less2_t : public std::binary_function<typename FtorA::argument_type, typename FtorB::argument_type, bool> {
+struct less2_t : public std::function<bool (typename FtorA::argument_type, typename FtorB::argument_type)> {
   less2_t(FtorA f_a, FtorB f_b) : m_f_a(f_a), m_f_b(f_b) {}
 
   bool operator () (typename FtorA::argument_type a, typename FtorB::argument_type b) {
@@ -210,7 +210,7 @@ greater(Type t, Ftor f) {
 }
 
 template <typename FtorA, typename FtorB>
-struct greater2_t : public std::binary_function<typename FtorA::argument_type, typename FtorB::argument_type, bool> {
+struct greater2_t : public std::function<bool (typename FtorA::argument_type, typename FtorB::argument_type)> {
   greater2_t(FtorA f_a, FtorB f_b) : m_f_a(f_a), m_f_b(f_b) {}
 
   bool operator () (typename FtorA::argument_type a, typename FtorB::argument_type b) {
@@ -270,13 +270,13 @@ greater_equal(Type t, Ftor f) {
 }
 
 template<typename Tp>
-struct invert : public std::unary_function<Tp, Tp> {
+struct invert : public std::function<Tp (Tp)> {
   Tp
   operator () (const Tp& x) const { return ~x; }
 };
 
 template <typename Src, typename Dest>
-struct on_t : public std::unary_function<typename Src::argument_type, typename Dest::result_type> {
+struct on_t : public std::function<typename Dest::result_type (typename Src::argument_type)> {
   typedef typename Dest::result_type result_type;
 
   on_t(Src s, Dest d) : m_dest(d), m_src(s) {}
@@ -296,7 +296,7 @@ on(Src s, Dest d) {
 }  
 
 template <typename Src, typename Dest>
-struct on2_t : public std::binary_function<typename Src::argument_type, typename Dest::second_argument_type, typename Dest::result_type> {
+struct on2_t : public std::function<typename Dest::result_type (typename Src::argument_type, typename Dest::second_argument_type)> {
   typedef typename Dest::result_type result_type;
 
   on2_t(Src s, Dest d) : m_dest(d), m_src(s) {}
@@ -317,7 +317,7 @@ on2(Src s, Dest d) {
 
 // Creates a functor for accessing a member.
 template <typename Class, typename Member>
-struct mem_ptr_t : public std::unary_function<Class*, Member&> {
+struct mem_ptr_t : public std::function<Member& (Class*)> {
   mem_ptr_t(Member Class::*m) : m_member(m) {}
 
   Member& operator () (Class* c) {
@@ -338,7 +338,7 @@ mem_ptr(Member Class::*m) {
 }
 
 template <typename Class, typename Member>
-struct mem_ref_t : public std::unary_function<Class&, Member&> {
+struct mem_ref_t : public std::function<Member& (Class&)> {
   mem_ref_t(Member Class::*m) : m_member(m) {}
 
   Member& operator () (Class& c) {
@@ -349,7 +349,7 @@ struct mem_ref_t : public std::unary_function<Class&, Member&> {
 };
 
 template <typename Class, typename Member>
-struct const_mem_ref_t : public std::unary_function<const Class&, const Member&> {
+struct const_mem_ref_t : public std::function<const Member& (const Class&)> {
   const_mem_ref_t(const Member Class::*m) : m_member(m) {}
 
   const Member& operator () (const Class& c) {
@@ -392,7 +392,7 @@ if_then(Cond c, Then t) {
 }
 
 template <typename T>
-struct call_delete : public std::unary_function<T*, void> {
+struct call_delete : public std::function<void (T*)> {
   void operator () (T* t) {
     delete t;
   }
@@ -405,7 +405,7 @@ call_delete_func(T* t) {
 }
 
 template <typename Operation>
-class bind1st_t : public std::unary_function<typename Operation::second_argument_type, typename Operation::result_type> {
+class bind1st_t : public std::function<typename Operation::result_type (typename Operation::second_argument_type)> {
 public:
   typedef typename reference_fix<typename Operation::first_argument_type>::type  value_type;
   typedef typename reference_fix<typename Operation::second_argument_type>::type argument_type;
@@ -430,7 +430,7 @@ bind1st(const Operation& op, const Type& val) {
 }
 
 template <typename Operation>
-class bind2nd_t : public std::unary_function<typename Operation::first_argument_type, typename Operation::result_type> {
+class bind2nd_t : public std::function<typename Operation::result_type (typename Operation::first_argument_type)> {
 public:
   typedef typename reference_fix<typename Operation::first_argument_type>::type argument_type;
   typedef typename reference_fix<typename Operation::second_argument_type>::type value_type;
@@ -548,7 +548,7 @@ private:
 };
 
 template <typename Object, typename Ret, typename Arg1, typename Arg2>
-class mem_fun2 : public std::binary_function<Arg1, Arg2, Ret> {
+class mem_fun2 : public std::function<Ret (Arg1, Arg2)> {
 public:
   typedef Ret result_type;
   typedef Ret (Object::*Function)(Arg1, Arg2);

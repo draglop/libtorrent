@@ -106,7 +106,7 @@ HashQueue::push_back(ChunkHandle handle, HashQueueNode::id_type id, slot_done_ty
 
 bool
 HashQueue::has(HashQueueNode::id_type id) {
-  return std::find_if(begin(), end(), rak::equal(id, std::mem_fun_ref(&HashQueueNode::id))) != end();
+  return std::find_if(begin(), end(), rak::equal(id, std::mem_fn(&HashQueueNode::id))) != end();
 }
 
 bool
@@ -118,7 +118,7 @@ void
 HashQueue::remove(HashQueueNode::id_type id) {
   iterator itr = begin();
   
-  while ((itr = std::find_if(itr, end(), rak::equal(id, std::mem_fun_ref(&HashQueueNode::id)))) != end()) {
+  while ((itr = std::find_if(itr, end(), rak::equal(id, std::mem_fn(&HashQueueNode::id)))) != end()) {
     HashChunk *hash_chunk = itr->get_chunk();
 
     LT_LOG_DATA(id, DEBUG, "Removing index:%" PRIu32 " from queue.", hash_chunk->handle().index());
@@ -156,7 +156,7 @@ HashQueue::clear() {
     throw internal_error("HashQueue::clear() called but valid nodes were found.");
 
   // Replace with a dtor check to ensure it is empty?
-//   std::for_each(begin(), end(), std::mem_fun_ref(&HashQueueNode::clear));
+//   std::for_each(begin(), end(), std::mem_fn(&HashQueueNode::clear));
 //   base_type::clear();
 }
 

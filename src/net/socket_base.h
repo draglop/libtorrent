@@ -48,7 +48,7 @@ namespace torrent {
 class SocketBase : public Event {
 public:
   SocketBase() { set_fd(SocketFd()); }
-  virtual ~SocketBase();
+  virtual ~SocketBase() noexcept(false);
 
   // Ugly hack... But the alternative is to include SocketFd as part
   // of the library API or make SocketFd::m_fd into an non-modifiable

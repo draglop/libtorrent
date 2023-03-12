@@ -92,7 +92,7 @@ cleanup() {
 bool
 is_inactive() {
   return manager == NULL ||
-    std::find_if(manager->download_manager()->begin(), manager->download_manager()->end(), std::not1(std::mem_fun(&DownloadWrapper::is_stopped)))
+    std::find_if(manager->download_manager()->begin(), manager->download_manager()->end(), std::not1(std::mem_fn(&DownloadWrapper::is_stopped)))
     == manager->download_manager()->end();
 }
 
@@ -129,7 +129,7 @@ encoding_list() {
 
 Download
 download_add(Object* object) {
-  std::auto_ptr<DownloadWrapper> download(new DownloadWrapper);
+  std::unique_ptr<DownloadWrapper> download(new DownloadWrapper);
 
   DownloadConstructor ctor;
   ctor.set_download(download.get());

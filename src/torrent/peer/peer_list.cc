@@ -51,7 +51,7 @@ socket_address_less(const sockaddr* s1, const sockaddr* s2) {
   }
 }
 
-struct peer_list_equal_port : public std::binary_function<PeerList::reference, uint16_t, bool> {
+struct peer_list_equal_port : public std::function<bool (PeerList::reference, uint16_t)> {
   bool operator () (PeerList::reference p, uint16_t port) {
     return rak::socket_address::cast_from(p.second->socket_address())->port() == port;
   }
@@ -164,7 +164,7 @@ PeerList::insert_available(const void* al) {
       continue;
     }
 
-    availItr = std::find_if(availItr, availLast, rak::bind2nd(std::ptr_fun(&socket_address_less_rak), *itr));
+    availItr = std::find_if(availItr, availLast, rak::bind2nd(std::function<bool (const rak::socket_address&, const rak::socket_address&)>(&socket_address_less_rak), *itr));
 
     if (availItr != availLast && !socket_address_less(availItr->c_sockaddr(), itr->c_sockaddr())) {
       // The address is already in m_available_list, so don't bother

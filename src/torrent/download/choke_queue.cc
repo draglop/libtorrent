@@ -38,7 +38,7 @@ log_choke_changes_func_new(void* address, const char* title, int quota, int adju
                title, quota, adjust);
 }
 
-choke_queue::~choke_queue() {
+choke_queue::~choke_queue() noexcept(false) {
   if (m_currently_unchoked != 0)
     throw internal_error("choke_queue::~choke_queue() called but m_currentlyUnchoked != 0.");
 

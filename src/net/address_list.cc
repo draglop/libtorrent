@@ -64,7 +64,7 @@ AddressList::parse_address(const Object& b) {
 
 void
 AddressList::parse_address_normal(const Object::list_type& b) {
-  std::for_each(b.begin(), b.end(), rak::on(std::ptr_fun(&AddressList::parse_address), AddressList::add_address(this)));
+  std::for_each(b.begin(), b.end(), rak::on(std::function<rak::socket_address (const torrent::Object&)>(&AddressList::parse_address), AddressList::add_address(this)));
 }
 
 void

@@ -37,6 +37,7 @@
 #ifndef LIBTORRENT_DOWNLOAD_ADDRESS_LIST_H
 #define LIBTORRENT_DOWNLOAD_ADDRESS_LIST_H
 
+#include <functional>
 #include <list>
 #include <string>
 #include <rak/socket_address.h>
@@ -59,7 +60,7 @@ public:
 private:
   static rak::socket_address  parse_address(const Object& b);
 
-  struct add_address : public std::unary_function<rak::socket_address, void> {
+  struct add_address : public std::function<void (rak::socket_address)> {
     add_address(AddressList* l) : m_list(l) {}
 
     void operator () (const rak::socket_address& sa) const {

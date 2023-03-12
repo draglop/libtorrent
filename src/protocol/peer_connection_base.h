@@ -86,7 +86,7 @@ public:
   static const int PEX_DISABLE = (1 << 2);
 
   PeerConnectionBase();
-  virtual ~PeerConnectionBase();
+  virtual ~PeerConnectionBase() noexcept(false);
   
   const char*         type_name() const { return "pcb"; }
 

@@ -75,28 +75,28 @@ DownloadManager::clear() {
 DownloadManager::iterator
 DownloadManager::find(const std::string& hash) {
   return std::find_if(begin(), end(), rak::equal(*HashString::cast_from(hash),
-                                                 rak::on(std::mem_fun(&DownloadWrapper::info), std::mem_fun(&DownloadInfo::hash))));
+                                                 rak::on(std::mem_fn(&DownloadWrapper::info), std::mem_fn(&DownloadInfo::hash))));
 }
 
 DownloadManager::iterator
 DownloadManager::find(const HashString& hash) {
-  return std::find_if(begin(), end(), rak::equal(hash, rak::on(std::mem_fun(&DownloadWrapper::info), std::mem_fun(&DownloadInfo::hash))));
+  return std::find_if(begin(), end(), rak::equal(hash, rak::on(std::mem_fn(&DownloadWrapper::info), std::mem_fn(&DownloadInfo::hash))));
 }
 
 DownloadManager::iterator
 DownloadManager::find(DownloadInfo* info) {
-  return std::find_if(begin(), end(), rak::equal(info, std::mem_fun(&DownloadWrapper::info)));
+  return std::find_if(begin(), end(), rak::equal(info, std::mem_fn(&DownloadWrapper::info)));
 }
 
 DownloadManager::iterator
 DownloadManager::find_chunk_list(ChunkList* cl) {
-  return std::find_if(begin(), end(), rak::equal(cl, std::mem_fun(&DownloadWrapper::chunk_list)));
+  return std::find_if(begin(), end(), rak::equal(cl, std::mem_fn(&DownloadWrapper::chunk_list)));
 }
 
 DownloadMain*
 DownloadManager::find_main(const char* hash) {
   iterator itr = std::find_if(begin(), end(), rak::equal(*HashString::cast_from(hash),
-                                                         rak::on(std::mem_fun(&DownloadWrapper::info), std::mem_fun(&DownloadInfo::hash))));
+                                                         rak::on(std::mem_fn(&DownloadWrapper::info), std::mem_fn(&DownloadInfo::hash))));
 
   if (itr == end())
     return NULL;
@@ -107,7 +107,7 @@ DownloadManager::find_main(const char* hash) {
 DownloadMain*
 DownloadManager::find_main_obfuscated(const char* hash) {
   iterator itr = std::find_if(begin(), end(), rak::equal(*HashString::cast_from(hash),
-                                                         rak::on(std::mem_fun(&DownloadWrapper::info), std::mem_fun(&DownloadInfo::hash_obfuscated))));
+                                                         rak::on(std::mem_fn(&DownloadWrapper::info), std::mem_fn(&DownloadInfo::hash_obfuscated))));
 
   if (itr == end())
     return NULL;

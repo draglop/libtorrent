@@ -77,7 +77,7 @@ TrackerUdp::TrackerUdp(TrackerList* parent, const std::string& url, int flags) :
   m_taskTimeout.slot() = std::bind(&TrackerUdp::receive_timeout, this);
 }
 
-TrackerUdp::~TrackerUdp() {
+TrackerUdp::~TrackerUdp() noexcept(false) {
   if (m_slot_resolver != NULL) {
     *m_slot_resolver = resolver_type();
     m_slot_resolver = NULL;

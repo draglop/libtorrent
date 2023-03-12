@@ -105,9 +105,9 @@ RequestList::delegate() {
 
 void
 RequestList::stall_initial() {
-  queue_bucket_for_all_in_queue(m_queues, bucket_queued, std::ptr_fun(&Block::stalled));
+  queue_bucket_for_all_in_queue(m_queues, bucket_queued, std::function<void (torrent::BlockTransfer*)>(&Block::stalled));
   m_queues.move_all_to(bucket_queued, bucket_stalled);
-  queue_bucket_for_all_in_queue(m_queues, bucket_unordered, std::ptr_fun(&Block::stalled));
+  queue_bucket_for_all_in_queue(m_queues, bucket_unordered, std::function<void (torrent::BlockTransfer*)>(&Block::stalled));
   m_queues.move_all_to(bucket_unordered, bucket_stalled);
 }
 
@@ -116,9 +116,9 @@ RequestList::stall_prolonged() {
   if (m_transfer != NULL)
     Block::stalled(m_transfer);
 
-  queue_bucket_for_all_in_queue(m_queues, bucket_queued, std::ptr_fun(&Block::stalled));
+  queue_bucket_for_all_in_queue(m_queues, bucket_queued, std::function<void (torrent::BlockTransfer*)>(&Block::stalled));
   m_queues.move_all_to(bucket_queued, bucket_stalled);
-  queue_bucket_for_all_in_queue(m_queues, bucket_unordered, std::ptr_fun(&Block::stalled));
+  queue_bucket_for_all_in_queue(m_queues, bucket_unordered, std::function<void (torrent::BlockTransfer*)>(&Block::stalled));
   m_queues.move_all_to(bucket_unordered, bucket_stalled);
 
   // Currently leave the the requests until the peer gets disconnected. (?)
@@ -229,7 +229,7 @@ RequestList::downloading(const Piece& piece) {
     //
     // Alternatively, move back some elements to bucket_queued.
 
-    if (std::distance(m_queues.begin(itr.first), itr.second) < m_last_unordered_position)
+    if (std::distance(m_queues.begin(itr.first), itr.second) < static_cast<ssize_t>(m_last_unordered_position))
       m_last_unordered_position--;
 
     m_transfer = m_queues.take(itr.first, itr.second);
@@ -328,7 +328,7 @@ RequestList::transfer_dissimilar() {
   m_transfer = dummy;
 }
 
-struct equals_reservee : public std::binary_function<BlockTransfer*, uint32_t, bool> {
+struct equals_reservee : public std::function<bool (BlockTransfer*, uint32_t)> {
   bool operator () (BlockTransfer* r, uint32_t index) const {
     return r->is_valid() && index == r->index();
   }

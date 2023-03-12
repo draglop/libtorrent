@@ -61,19 +61,19 @@ TransferList::TransferList() :
 
 // TODO: Derp if transfer list isn't cleared...
 
-TransferList::~TransferList() {
+TransferList::~TransferList() noexcept(false) {
   if (!base_type::empty())
     throw internal_error("TransferList::~TransferList() called on an non-empty object");
 }
 
 TransferList::iterator
 TransferList::find(uint32_t index) {
-  return std::find_if(begin(), end(), rak::equal(index, std::mem_fun(&BlockList::index)));
+  return std::find_if(begin(), end(), rak::equal(index, std::mem_fn(&BlockList::index)));
 }
 
 TransferList::const_iterator
 TransferList::find(uint32_t index) const {
-  return std::find_if(begin(), end(), rak::equal(index, std::mem_fun(&BlockList::index)));
+  return std::find_if(begin(), end(), rak::equal(index, std::mem_fn(&BlockList::index)));
 }
 
 void
@@ -125,7 +125,7 @@ TransferList::hash_succeeded(uint32_t index, Chunk* chunk) {
   iterator blockListItr = find(index);
 
   if ((Block::size_type)std::count_if((*blockListItr)->begin(), (*blockListItr)->end(),
-                                      std::mem_fun_ref(&Block::is_finished)) != (*blockListItr)->size())
+                                      std::bind(&Block::is_finished, std::placeholders::_1)) != (*blockListItr)->size())
     throw internal_error("TransferList::hash_succeeded(...) Finished blocks does not match size.");
 
   // The chunk should also be marked here or by the caller so that it
@@ -174,7 +174,7 @@ TransferList::hash_failed(uint32_t index, Chunk* chunk) {
   if (blockListItr == end())
     throw internal_error("TransferList::hash_failed(...) Could not find index.");
 
-  if ((Block::size_type)std::count_if((*blockListItr)->begin(), (*blockListItr)->end(), std::mem_fun_ref(&Block::is_finished)) != (*blockListItr)->size())
+  if ((Block::size_type)std::count_if((*blockListItr)->begin(), (*blockListItr)->end(), std::bind(&Block::is_finished, std::placeholders::_1)) != (*blockListItr)->size())
     throw internal_error("TransferList::hash_failed(...) Finished blocks does not match size.");
 
   m_failedCount++;

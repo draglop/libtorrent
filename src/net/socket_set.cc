@@ -67,7 +67,7 @@ SocketSet::_replace_with_last(size_type idx) {
 void
 SocketSet::prepare() {
   std::for_each(m_erased.begin(), m_erased.end(),
-		std::bind1st(std::mem_fun(&SocketSet::_replace_with_last), this));
+  std::bind(std::mem_fn(&SocketSet::_replace_with_last), this, std::placeholders::_1));
 
   m_erased.clear();
 }

@@ -75,7 +75,7 @@ DhtBucket::add_node(DhtNode* n) {
 
 void
 DhtBucket::remove_node(DhtNode* n) {
-  iterator itr = std::find_if(begin(), end(), std::bind2nd(std::equal_to<DhtNode*>(), n));
+  iterator itr = std::find_if(begin(), end(), std::bind(std::equal_to<DhtNode*>(), std::placeholders::_1, n));
   if (itr == end())
     throw internal_error("DhtBucket::remove_node called for node not in bucket.");
 
@@ -91,8 +91,8 @@ DhtBucket::remove_node(DhtNode* n) {
 
 void
 DhtBucket::count() {
-  m_good = std::count_if(begin(), end(), std::mem_fun(&DhtNode::is_good));
-  m_bad = std::count_if(begin(), end(), std::mem_fun(&DhtNode::is_bad));
+  m_good = std::count_if(begin(), end(), std::mem_fn(&DhtNode::is_good));
+  m_bad = std::count_if(begin(), end(), std::mem_fn(&DhtNode::is_bad));
 }
 
 // Called every 15 minutes for housekeeping.
@@ -165,9 +165,9 @@ DhtBucket::split(const HashString& id) {
 
   // Move nodes over to other bucket if they fall in its range, then
   // delete them from this one.
-  iterator split = std::partition(begin(), end(), std::bind2nd(std::mem_fun(&DhtNode::is_in_range), this));
+  iterator split = std::partition(begin(), end(), std::bind(std::mem_fn(&DhtNode::is_in_range), std::placeholders::_1, this));
   other->insert(other->end(), split, end());
-  std::for_each(other->begin(), other->end(), std::bind2nd(std::mem_fun(&DhtNode::set_bucket), other));
+  std::for_each(other->begin(), other->end(), std::bind(std::mem_fn(&DhtNode::set_bucket), std::placeholders::_1, other));
   erase(split, end());
 
   other->set_time(m_lastChanged);

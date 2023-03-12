@@ -38,12 +38,12 @@ handshake_manager_delete_handshake(Handshake* h) {
 
 HandshakeManager::size_type
 HandshakeManager::size_info(DownloadMain* info) const {
-  return std::count_if(base_type::begin(), base_type::end(), rak::equal(info, std::mem_fun(&Handshake::download)));
+  return std::count_if(base_type::begin(), base_type::end(), rak::equal(info, std::mem_fn(&Handshake::download)));
 }
 
 void
 HandshakeManager::clear() {
-  std::for_each(base_type::begin(), base_type::end(), std::ptr_fun(&handshake_manager_delete_handshake));
+  std::for_each(base_type::begin(), base_type::end(), std::function<void (torrent::Handshake*)>(&handshake_manager_delete_handshake));
   base_type::clear();
 }
 
@@ -57,7 +57,7 @@ HandshakeManager::erase(Handshake* handshake) {
   base_type::erase(itr);
 }
 
-struct handshake_manager_equal : std::binary_function<const rak::socket_address*, const Handshake*, bool> {
+struct handshake_manager_equal : std::function<bool (const rak::socket_address*, const Handshake*)> {
   bool operator () (const rak::socket_address* sa1, const Handshake* p2) const {
     return p2->peer_info() != NULL && *sa1 == *rak::socket_address::cast_from(p2->peer_info()->socket_address());
   }
@@ -65,15 +65,15 @@ struct handshake_manager_equal : std::binary_function<const rak::socket_address*
 
 bool
 HandshakeManager::find(const rak::socket_address& sa) {
-  return std::find_if(base_type::begin(), base_type::end(), std::bind1st(handshake_manager_equal(), &sa)) != base_type::end();
+  return std::find_if(base_type::begin(), base_type::end(), std::bind(handshake_manager_equal(), &sa, std::placeholders::_1)) != base_type::end();
 }
 
 void
 HandshakeManager::erase_download(DownloadMain* info) {
   iterator split = std::partition(base_type::begin(), base_type::end(),
-                                  rak::not_equal(info, std::mem_fun(&Handshake::download)));
+                                  rak::not_equal(info, std::mem_fn(&Handshake::download)));
 
-  std::for_each(split, base_type::end(), std::ptr_fun(&handshake_manager_delete_handshake));
+  std::for_each(split, base_type::end(), std::function<void (torrent::Handshake*)>(&handshake_manager_delete_handshake));
   base_type::erase(split, base_type::end());
 }
 

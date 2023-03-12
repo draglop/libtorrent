@@ -137,7 +137,12 @@ partial_queue::clear() {
   m_index = 0;
   m_ceiling = ceiling(num_layers - 1);
 
-  std::memset(m_layers, 0, num_layers * sizeof(size_pair_type));
+  // std::memset(m_layers, 0, num_layers * sizeof(size_pair_type));
+  // maybe slower than above but remove compilation warning
+  for (size_pair_type& p : m_layers) {
+    p.first = 0;
+    p.second = 0;
+  }
 }
 
 inline bool

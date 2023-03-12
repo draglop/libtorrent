@@ -1,4 +1,4 @@
-#import "helpers/test_fixture.h"
+#include "helpers/test_fixture.h"
 
 class test_hash_check_queue : public test_fixture {
   CPPUNIT_TEST_SUITE(test_hash_check_queue);
@@ -21,12 +21,12 @@ public:
   void test_thread();
 };
 
-#import <map>
-#import <vector>
+#include <map>
+#include <vector>
 
-#import "data/hash_queue_node.h"
-#import "data/hash_check_queue.h"
-#import "torrent/hash_string.h"
+#include "data/hash_queue_node.h"
+#include "data/hash_check_queue.h"
+#include "torrent/hash_string.h"
 
 typedef std::map<int, torrent::HashString> done_chunks_type;
 typedef std::vector<torrent::ChunkHandle> handle_list;

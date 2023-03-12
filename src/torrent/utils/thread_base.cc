@@ -41,9 +41,6 @@ thread_base::~thread_base() {
 
 void
 thread_base::start_thread() {
-  if (this == nullptr)
-    throw internal_error("Called thread_base::start_thread on a nullptr.");
-
   if (m_poll == nullptr)
     throw internal_error("No poll object for thread defined.");
 

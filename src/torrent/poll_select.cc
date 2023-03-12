@@ -153,7 +153,7 @@ PollSelect::create(int maxOpenSockets) {
   return p;
 }
 
-PollSelect::~PollSelect() {
+PollSelect::~PollSelect() noexcept(false) {
   m_readSet->prepare();
   m_writeSet->prepare();
   m_exceptSet->prepare();
@@ -208,15 +208,15 @@ PollSelect::perform(fd_set* readSet, fd_set* writeSet, fd_set* exceptSet) {
   // not be a problem as any except call should remove it from the m_*Set's.
   m_exceptSet->prepare();
   count += std::count_if(m_exceptSet->begin(), m_exceptSet->end(),
-                         poll_check(this, exceptSet, std::mem_fun(&Event::event_error)));
+                         poll_check(this, exceptSet, std::mem_fn(&Event::event_error)));
 
   m_readSet->prepare();
   count += std::count_if(m_readSet->begin(), m_readSet->end(),
-                         poll_check(this, readSet, std::mem_fun(&Event::event_read)));
+                         poll_check(this, readSet, std::mem_fn(&Event::event_read)));
 
   m_writeSet->prepare();
   count += std::count_if(m_writeSet->begin(), m_writeSet->end(),
-                         poll_check(this, writeSet, std::mem_fun(&Event::event_write)));
+                         poll_check(this, writeSet, std::mem_fn(&Event::event_write)));
 
   return count;
 }

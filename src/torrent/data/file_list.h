@@ -199,7 +199,7 @@ private:
 
 inline FileList::iterator
 file_list_contains_position(FileList* file_list, uint64_t pos) {
-  return std::find_if(file_list->begin(), file_list->end(), std::bind2nd(std::mem_fun(&File::is_valid_position), pos));
+  return std::find_if(file_list->begin(), file_list->end(), std::bind(std::mem_fn(&File::is_valid_position), std::placeholders::_1, pos));
 }
 
 }

@@ -49,10 +49,10 @@ main() {
 
 //     std::vector<rak::priority_item*> due;
 
-//     std::copy(rak::queue_popper(queue, rak::bind2nd(std::mem_fun(&rak::priority_item::compare), 20)),
-// 	      rak::queue_popper(queue, rak::bind2nd(std::mem_fun(&rak::priority_item::compare), rak::timer())),
+//     std::copy(rak::queue_popper(queue, rak::bind2nd(std::mem_fn(&rak::priority_item::compare), 20)),
+// 	      rak::queue_popper(queue, rak::bind2nd(std::mem_fn(&rak::priority_item::compare), rak::timer())),
 // 	      std::back_inserter(due));
-//     std::for_each(due.begin(), due.end(), std::ptr_fun(&print_item));
+//     std::for_each(due.begin(), due.end(), std::function<void (rak::priority_item*)>(&print_item));
 
     while (!queue.empty()) {
       rak::priority_item* i = queue.top();

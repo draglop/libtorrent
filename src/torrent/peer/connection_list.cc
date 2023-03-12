@@ -71,7 +71,7 @@ ConnectionList::ConnectionList(DownloadMain* download) :
 
 void
 ConnectionList::clear() {
-  std::for_each(begin(), end(), rak::on(std::mem_fun(&Peer::m_ptr), rak::call_delete<PeerConnectionBase>()));
+  std::for_each(begin(), end(), rak::on(std::mem_fn(&Peer::m_ptr), rak::call_delete<PeerConnectionBase>()));
   base_type::clear();
   
   m_disconnectQueue.clear();
@@ -179,7 +179,7 @@ ConnectionList::erase_remaining(iterator pos, int flags) {
 
 void
 ConnectionList::erase_seeders() {
-  erase_remaining(std::partition(begin(), end(), rak::on(std::mem_fun(&Peer::c_ptr), std::mem_fun(&PeerConnectionBase::is_not_seeder))),
+  erase_remaining(std::partition(begin(), end(), rak::on(std::mem_fn(&Peer::c_ptr), std::mem_fn(&PeerConnectionBase::is_not_seeder))),
                   disconnect_unwanted);
 }
 
@@ -214,14 +214,14 @@ struct connection_list_less {
 ConnectionList::iterator
 ConnectionList::find(const char* id) {
   return std::find_if(begin(), end(), rak::equal(*HashString::cast_from(id),
-                                                 rak::on(std::mem_fun(&Peer::m_ptr), rak::on(std::mem_fun(&PeerConnectionBase::peer_info), std::mem_fun(&PeerInfo::id)))));
+                                                 rak::on(std::mem_fn(&Peer::m_ptr), rak::on(std::mem_fn(&PeerConnectionBase::peer_info), std::mem_fn(&PeerInfo::id)))));
 }
 
 ConnectionList::iterator
 ConnectionList::find(const sockaddr* sa) {
   return std::find_if(begin(), end(), rak::equal_ptr(rak::socket_address::cast_from(sa),
-                                                     rak::on(std::mem_fun(&Peer::m_ptr), rak::on(std::mem_fun(&PeerConnectionBase::peer_info),
-                                                                                                 std::mem_fun(&PeerInfo::socket_address)))));
+                                                     rak::on(std::mem_fn(&Peer::m_ptr), rak::on(std::mem_fn(&PeerConnectionBase::peer_info),
+                                                                                                 std::mem_fn(&PeerInfo::socket_address)))));
 }
 
 void

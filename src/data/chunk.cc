@@ -60,12 +60,12 @@ namespace torrent {
 
 bool
 Chunk::is_all_valid() const {
-  return !empty() && std::find_if(begin(), end(), std::not1(std::mem_fun_ref(&ChunkPart::is_valid))) == end();
+  return !empty() && std::find_if(begin(), end(), std::bind(std::logical_not<bool>(), std::bind(&ChunkPart::is_valid, std::placeholders::_1))) == end();
 }
 
 void
 Chunk::clear() {
-  std::for_each(begin(), end(), std::mem_fun_ref(&ChunkPart::clear));
+  std::for_each(begin(), end(), std::mem_fn(&ChunkPart::clear));
 
   m_chunkSize = 0;
   m_prot = ~0;
@@ -95,7 +95,7 @@ Chunk::at_position(uint32_t pos) {
   if (pos >= m_chunkSize)
     throw internal_error("Chunk::at_position(...) tried to get Chunk position out of range.");
 
-  iterator itr = std::find_if(begin(), end(), std::bind2nd(std::mem_fun_ref(&ChunkPart::is_contained), pos));
+  iterator itr = std::find_if(begin(), end(), std::bind(std::mem_fn(&ChunkPart::is_contained), std::placeholders::_1, pos));
 
   if (itr == end())
     throw internal_error("Chunk::at_position(...) might be mangled, at_position failed horribly");

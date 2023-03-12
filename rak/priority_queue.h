@@ -81,7 +81,7 @@ public:
 
   template <typename Key>
   iterator find(const Key& key) {
-    return std::find_if(begin(), end(), std::bind2nd(m_equal, key));
+    return std::find_if(begin(), end(), std::bind(m_equal, std::placeholders::_1, key));
   }
 
   template <typename Key>
@@ -113,9 +113,14 @@ private:
 // Iterate while the top node has higher priority, as 'Compare'
 // returns false.
 template <typename Queue, typename Compare>
-class queue_pop_iterator
-  : public std::iterator<std::forward_iterator_tag, void, void, void, void> {
+class queue_pop_iterator {
 public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = void;
+  using difference_type = void;
+  using pointer = void;
+  using reference = void;
+
   typedef Queue container_type;
 
   queue_pop_iterator() : m_queue(NULL) {}

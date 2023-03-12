@@ -74,7 +74,7 @@ struct download_constructor_is_multi_path {
 };
 
 struct download_constructor_encoding_match :
-    public std::binary_function<const Path&, const char*, bool> {
+    public std::function<bool (const Path&, const char*)> {
 
   bool operator () (const Path& p, const char* enc) {
     return strcasecmp(p.encoding().c_str(), enc) == 0;
@@ -192,7 +192,7 @@ DownloadConstructor::parse_tracker(const Object& b) {
       // Some torrent makers create empty/invalid 'announce-list'
       // entries while still having valid 'announce'.
       !(announce_list = &b.get_key_list("announce-list"))->empty() &&
-      std::find_if(announce_list->begin(), announce_list->end(), std::mem_fun_ref(&Object::is_list)) != announce_list->end())
+      std::find_if(announce_list->begin(), announce_list->end(), std::mem_fn(&Object::is_list)) != announce_list->end())
 
     std::for_each(announce_list->begin(), announce_list->end(), rak::make_mem_fun(this, &DownloadConstructor::add_tracker_group));
 
@@ -340,13 +340,13 @@ DownloadConstructor::create_path(const Object::list_type& plist, const std::stri
   if (plist.empty())
     throw input_error("Bad torrent file, \"path\" has zero entries.");
 
-  if (std::find_if(plist.begin(), plist.end(), std::ptr_fun(&DownloadConstructor::is_invalid_path_element)) != plist.end())
+  if (std::find_if(plist.begin(), plist.end(), std::function<bool (const torrent::Object&)>(&DownloadConstructor::is_invalid_path_element)) != plist.end())
     throw input_error("Bad torrent file, \"path\" has zero entries or a zero length entry.");
 
   Path p;
   p.set_encoding(enc);
 
-  std::transform(plist.begin(), plist.end(), std::back_inserter(p), std::mem_fun_ref<const Object::string_type&>(&Object::as_string));
+  std::transform(plist.begin(), plist.end(), std::back_inserter(p), std::bind(static_cast<const Object::string_type& (Object::*)() const>(&Object::as_string), std::placeholders::_1));
 
   return p;
 }

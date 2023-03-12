@@ -112,16 +112,16 @@ ChunkList::clear() {
 
   m_queue.clear();
 
-  if (std::find_if(begin(), end(), std::mem_fun_ref(&ChunkListNode::chunk)) != end())
+  if (std::find_if(begin(), end(), std::mem_fn(&ChunkListNode::chunk)) != end())
     throw internal_error("ChunkList::clear() called but a node with a valid chunk was found.");
 
-  if (std::find_if(begin(), end(), std::mem_fun_ref(&ChunkListNode::references)) != end())
+  if (std::find_if(begin(), end(), std::mem_fn(&ChunkListNode::references)) != end())
     throw internal_error("ChunkList::clear() called but a node with references != 0 was found.");
 
-  if (std::find_if(begin(), end(), std::mem_fun_ref(&ChunkListNode::writable)) != end())
+  if (std::find_if(begin(), end(), std::mem_fn(&ChunkListNode::writable)) != end())
     throw internal_error("ChunkList::clear() called but a node with writable != 0 was found.");
 
-  if (std::find_if(begin(), end(), std::mem_fun_ref(&ChunkListNode::blocking)) != end())
+  if (std::find_if(begin(), end(), std::mem_fn(&ChunkListNode::blocking)) != end())
     throw internal_error("ChunkList::clear() called but a node with blocking != 0 was found.");
 
   base_type::clear();
@@ -291,7 +291,7 @@ ChunkList::sync_chunks(int flags) {
   if (flags & sync_all)
     split = m_queue.begin();
   else
-    split = std::stable_partition(m_queue.begin(), m_queue.end(), rak::not_equal(1, std::mem_fun(&ChunkListNode::writable)));
+    split = std::stable_partition(m_queue.begin(), m_queue.end(), rak::not_equal(1, std::mem_fn(&ChunkListNode::writable)));
 
   // Allow a flag that does more culling, so that we only get large
   // continous sections.
@@ -344,7 +344,7 @@ ChunkList::sync_chunks(int flags) {
     instrumentation_update(INSTRUMENTATION_MINCORE_SYNC_SUCCESS, std::distance(split, m_queue.end()));
     instrumentation_update(INSTRUMENTATION_MINCORE_SYNC_FAILED, failed);
     instrumentation_update(INSTRUMENTATION_MINCORE_SYNC_NOT_SYNCED, std::distance(m_queue.begin(), split));
-    instrumentation_update(INSTRUMENTATION_MINCORE_SYNC_NOT_DEALLOCATED, std::count_if(split, m_queue.end(), std::mem_fun(&ChunkListNode::is_valid)));
+    instrumentation_update(INSTRUMENTATION_MINCORE_SYNC_NOT_DEALLOCATED, std::count_if(split, m_queue.end(), std::mem_fn(&ChunkListNode::is_valid)));
   }
 
   m_queue.erase(split, m_queue.end());
@@ -415,7 +415,7 @@ ChunkList::partition_optimize(Queue::iterator first, Queue::iterator last, int w
   for (Queue::iterator itr = first; itr != last;) {
     Queue::iterator range = seek_range(itr, last);
 
-    bool required = std::find_if(itr, range, std::bind1st(std::mem_fun(&ChunkList::check_node), this)) != range;
+    bool required = std::find_if(itr, range, std::bind(std::mem_fn(&ChunkList::check_node), this, std::placeholders::_1)) != range;
     dontSkip = dontSkip || required;
 
     if (!required && std::distance(itr, range) < maxDistance) {

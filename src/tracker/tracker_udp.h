@@ -61,7 +61,7 @@ public:
   static const uint64_t magic_connection_id = 0x0000041727101980ll;
 
   TrackerUdp(TrackerList* parent, const std::string& url, int flags);
-  ~TrackerUdp();
+  ~TrackerUdp() noexcept(false);
   
   const char*         type_name() const { return "tracker_udp"; }
 
