@@ -140,13 +140,12 @@ TrackerController::manual_request(bool request_now) {
 
 void
 TrackerController::scrape_request(uint32_t seconds_to_request) {
-  rak::timer next_timeout = cachedTime;
-
-  if (seconds_to_request != 0)
-    next_timeout = (cachedTime + rak::timer::from_seconds(seconds_to_request)).round_seconds();
-
   priority_queue_erase(&taskScheduler, &m_private->task_scrape);
-  priority_queue_insert(&taskScheduler, &m_private->task_scrape, next_timeout);
+
+  if (seconds_to_request != 0) {
+    rak::timer next_timeout = (cachedTime + rak::timer::from_seconds(seconds_to_request)).round_seconds();
+    priority_queue_insert(&taskScheduler, &m_private->task_scrape, next_timeout);
+  }
 }
 
 // The send_*_event() functions tries to ensure the relevant trackers

@@ -158,7 +158,7 @@ tracker_controller_features::test_scrape_basic() {
   tracker_0_2->set_can_scrape();
   tracker_2_0->set_can_scrape();
   
-  tracker_controller.scrape_request(0);
+  tracker_controller.scrape_request(1);
 
   TEST_GROUP_IS_BUSY("000000", "000000");
   CPPUNIT_ASSERT(!tracker_controller.task_timeout()->is_queued());
@@ -167,7 +167,7 @@ tracker_controller_features::test_scrape_basic() {
   CPPUNIT_ASSERT(tracker_0_2->latest_event() == torrent::Tracker::EVENT_NONE);
   CPPUNIT_ASSERT(tracker_2_0->latest_event() == torrent::Tracker::EVENT_NONE);
 
-  TEST_GOTO_NEXT_SCRAPE(0);
+  TEST_GOTO_NEXT_SCRAPE(1);
 
   TEST_GROUP_IS_BUSY("010001", "010001");
   CPPUNIT_ASSERT(!tracker_controller.task_timeout()->is_queued());
@@ -197,9 +197,9 @@ tracker_controller_features::test_scrape_priority() {
   tracker_0_0->trigger_success();
   tracker_0_0->set_can_scrape();
 
-  tracker_controller.scrape_request(0);
+  tracker_controller.scrape_request(1);
 
-  TEST_GOTO_NEXT_SCRAPE(0);
+  TEST_GOTO_NEXT_SCRAPE(1);
   CPPUNIT_ASSERT(tracker_0_0->is_busy());
   CPPUNIT_ASSERT(tracker_0_0->latest_event() == torrent::Tracker::EVENT_SCRAPE);
 
@@ -219,8 +219,8 @@ tracker_controller_features::test_scrape_priority() {
   torrent::cachedTime += rak::timer::from_seconds(tracker_controller.seconds_to_next_timeout() - 1);
   rak::priority_queue_perform(&torrent::taskScheduler, torrent::cachedTime);
 
-  tracker_controller.scrape_request(0);
-  TEST_GOTO_NEXT_SCRAPE(0);
+  tracker_controller.scrape_request(1);
+  TEST_GOTO_NEXT_SCRAPE(1);
 
   CPPUNIT_ASSERT(tracker_0_0->is_busy());
   CPPUNIT_ASSERT(tracker_0_0->latest_event() == torrent::Tracker::EVENT_SCRAPE);
@@ -286,10 +286,10 @@ tracker_controller_features::test_groups_scrape() {
 
   CPPUNIT_ASSERT(!tracker_controller.task_scrape()->is_queued());
   
-  tracker_controller.scrape_request(0);
+  tracker_controller.scrape_request(1);
 
   TEST_GROUP_IS_BUSY("000000", "000000");
-  TEST_GOTO_NEXT_SCRAPE(0);
+  TEST_GOTO_NEXT_SCRAPE(1);
   CPPUNIT_ASSERT(tracker_0_0->latest_event() == torrent::Tracker::EVENT_SCRAPE);
   CPPUNIT_ASSERT(tracker_0_1->latest_event() == torrent::Tracker::EVENT_NONE);
   CPPUNIT_ASSERT(tracker_0_2->latest_event() == torrent::Tracker::EVENT_NONE);
