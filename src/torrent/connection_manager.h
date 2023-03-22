@@ -169,6 +169,9 @@ public:
   // For internal usage.
   Listen*             listen()            { return m_listen; }
 
+  bool                network_active_get() const  { return m_network_active; }
+  void                network_active_set(bool on) { m_network_active = on; }
+
   bool                is_block_ipv4() const  { return m_block_ipv4; }
   void                set_block_ipv4(bool v) { m_block_ipv4 = v; }
 
@@ -205,6 +208,8 @@ private:
   bool                m_block_ipv4;
   bool                m_block_ipv6;
   bool                m_prefer_ipv6;
+
+  bool                m_network_active;
 };
 
 }

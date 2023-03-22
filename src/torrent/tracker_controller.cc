@@ -38,9 +38,11 @@
 
 #include "exceptions.h"
 #include "download_info.h"
+#include "manager.h"
 #include "tracker.h"
 #include "tracker_controller.h"
 #include "tracker_list.h"
+#include "torrent/connection_manager.h"
 
 #include "rak/priority_queue_default.h"
 #include "utils/log.h"
@@ -503,29 +505,31 @@ TrackerController::do_timeout() {
 
 void
 TrackerController::do_scrape() {
-  TrackerList::iterator itr = m_tracker_list->begin();
+  if (manager->connection_manager()->network_active_get()) {
+    TrackerList::iterator itr = m_tracker_list->begin();
 
-  while (itr != m_tracker_list->end()) {
-    uint32_t group = (*itr)->group();
+    while (itr != m_tracker_list->end()) {
+      uint32_t group = (*itr)->group();
 
-    if (m_tracker_list->has_active_in_group(group)) {
-      itr = m_tracker_list->end_group(group);
-      continue;
-    }
-
-    TrackerList::iterator group_end = m_tracker_list->end_group((*itr)->group());
-
-    while (itr != group_end) {
-      if ((*itr)->can_scrape() && (*itr)->is_usable()) {
-        m_tracker_list->send_scrape(*itr);
-        break;
+      if (m_tracker_list->has_active_in_group(group)) {
+        itr = m_tracker_list->end_group(group);
+        continue;
       }
 
-      itr++;
-    }
+      TrackerList::iterator group_end = m_tracker_list->end_group((*itr)->group());
 
-    itr = group_end;
-  }  
+      while (itr != group_end) {
+        if ((*itr)->can_scrape() && (*itr)->is_usable()) {
+          m_tracker_list->send_scrape(*itr);
+          break;
+        }
+
+        itr++;
+      }
+
+      itr = group_end;
+    }
+  }
 }
 
 uint32_t

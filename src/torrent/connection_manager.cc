@@ -56,7 +56,12 @@ namespace torrent {
 
 // Fix TrackerUdp, etc, if this is made async.
 static ConnectionManager::slot_resolver_result_type*
-resolve_host_system(const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
+resolve_host_system(ConnectionManager* cm, const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
+  if (!cm->network_active_get()) {
+    slot(nullptr, 0);
+    return nullptr;
+  }
+
   if (manager->main_thread_main()->is_current())
     thread_base::release_global_lock();
 
@@ -74,17 +79,22 @@ resolve_host_system(const char* host, int family, int socktype, ConnectionManage
   rak::socket_address sa;
   sa.copy(*ai->address(), ai->length());
   rak::address_info::free_address_info(ai);
-  
+
   if (manager->main_thread_main()->is_current())
     thread_base::acquire_global_lock();
-  
+
   slot(sa.c_sockaddr(), 0);
   return NULL;
 }
 
 #ifdef HAVE_RESOLV_H
 static ConnectionManager::slot_resolver_result_type*
-resolve_host_custom(const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
+resolve_host_custom(ConnectionManager* cm, const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
+  if (!cm->network_active_get()) {
+    slot(nullptr, 0);
+    return nullptr;
+  }
+
   unsigned char response[NS_PACKETSZ];
   // TODO ipv6 / T_AAAA ?
   const int len = res_nquery(&_res, host, C_IN, T_A, response, sizeof(response));
@@ -132,7 +142,9 @@ ConnectionManager::ConnectionManager() :
 
   m_block_ipv4(false),
   m_block_ipv6(false),
-  m_prefer_ipv6(false) {
+  m_prefer_ipv6(false),
+
+  m_network_active(true) {
 
   m_bindAddress = (new rak::socket_address())->c_sockaddr();
   m_localAddress = (new rak::socket_address())->c_sockaddr();
@@ -143,6 +155,7 @@ ConnectionManager::ConnectionManager() :
   rak::socket_address::cast_from(m_proxyAddress)->clear();
 
   m_slot_resolver = std::bind(&resolve_host_system,
+                              this,
                               std::placeholders::_1,
                               std::placeholders::_2,
                               std::placeholders::_3,
@@ -214,6 +227,7 @@ ConnectionManager::dns_server_set(const sockaddr* sa) {
   _res.nscount = 1;
 
   m_slot_resolver = std::bind(&resolve_host_custom,
+                              this,
                               std::placeholders::_1,
                               std::placeholders::_2,
                               std::placeholders::_3,

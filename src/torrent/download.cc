@@ -38,6 +38,7 @@
 
 #include <cinttypes>
 
+#include "manager.h"
 #include "data/block.h"
 #include "data/block_list.h"
 #include "data/chunk_list.h"
@@ -50,6 +51,7 @@
 #include "protocol/peer_connection_base.h"
 #include "protocol/peer_factory.h"
 #include "peer/peer_info.h"
+#include "torrent/connection_manager.h"
 #include "torrent/download/choke_group.h"
 #include "torrent/download/choke_queue.h"
 #include "torrent/download_info.h"
@@ -123,6 +125,10 @@ Download::close(int flags) {
 
 void
 Download::start(int flags) {
+  if (!manager->connection_manager()->network_active_get()) {
+    throw internal_error("Tried to start a download while networking is disabled.");
+  }
+
   DownloadInfo* info = m_ptr->info();
 
   if (!m_ptr->hash_checker()->is_checked())
