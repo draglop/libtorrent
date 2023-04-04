@@ -436,6 +436,13 @@ TrackerController::do_timeout() {
 
   int send_state = current_send_state();
 
+  if (send_state == Tracker::EVENT_STOPPED) {
+    if (m_slot_timeout) {
+      m_slot_timeout();
+    }
+    return;
+  }
+
   if ((m_flags & (flag_promiscuous_mode | flag_requesting))) {
     uint32_t next_timeout = ~uint32_t();
 
