@@ -161,13 +161,11 @@ DownloadConstructor::parse_info(const Object& b) {
       throw input_error("Torrent has an invalid \"piece length\".");
   }
 
-  if (b.has_key("length")) {
-    parse_single_file(b, chunkSize);
-
-  } else if (b.has_key("files")) {
+  if (b.has_key("files")) {
     parse_multi_files(b.get_key("files"), chunkSize);
     fileList->set_root_dir("./" + m_download->info()->name());
-
+  } else if (b.has_key("length")) {
+    parse_single_file(b, chunkSize);
   } else if (!m_download->info()->is_meta_download()) {
     throw input_error("Torrent must have either length or files entry.");
   }
