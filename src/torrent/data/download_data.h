@@ -22,6 +22,7 @@ public:
   typedef void (function_void)(void);
 
   typedef std::function<function_void> slot_void;
+  typedef std::function<void (int)> slot_int;
 
   typedef void (function_chunk_list_node_p)(ChunkListNode *); 
   typedef std::function<function_chunk_list_node_p> slot_chunk_list_node_p;
@@ -44,6 +45,7 @@ public:
   void                   verify_wanted_chunks(const char* where) const;
 
   slot_void&             slot_initial_hash() const        { return m_slot_initial_hash; }
+  slot_int&              slot_error_hash() const          { return m_slot_error_hash; }
   slot_void&             slot_download_done() const       { return m_slot_download_done; }
   slot_void&             slot_partially_done() const      { return m_slot_partially_done; }
   slot_void&             slot_partially_restarted() const { return m_slot_partially_restarted; }
@@ -83,6 +85,7 @@ private:
   uint32_t               m_wanted_chunks;
 
   mutable slot_void      m_slot_initial_hash;
+  mutable slot_int       m_slot_error_hash;
   mutable slot_void      m_slot_download_done;
   mutable slot_void      m_slot_partially_done;
   mutable slot_void      m_slot_partially_restarted;
