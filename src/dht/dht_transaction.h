@@ -79,7 +79,7 @@ struct dht_compare_closer : public std::function<bool (const DhtNode*, const Dht
   raw_string                      target_raw_string() const { return raw_string(m_target.data(), HashString::size_data); }
 
   private:
-  const HashString&    m_target;
+  const HashString     m_target; // TODO DHT review: make it a reference to the class member once it can be initiliazed after it
 };
 
 // DhtSearch contains a list of nodes sorted by closeness to the given target,
