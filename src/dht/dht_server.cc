@@ -221,8 +221,10 @@ void
 DhtServer::ping(const HashString& id, const rak::socket_address* sa) {
   // No point pinging a node that we're already contacting otherwise.
   transaction_itr itr = m_transactions.lower_bound(DhtTransaction::key(sa, 0));
-  if (itr == m_transactions.end() || !DhtTransaction::key_match(itr->first, sa))
-    add_transaction(new DhtTransactionPing(id, sa), packet_prio_low);
+  if (itr == m_transactions.end() || !DhtTransaction::key_match(itr->first, sa)) {
+    std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionPing>(id, sa);
+    add_transaction(transactionToAdd, packet_prio_low);
+  }
 }
 
 // Contact nodes in given bucket and ask for their nodes closest to target.
@@ -230,9 +232,22 @@ void
 DhtServer::find_node(const DhtBucket& contacts, const HashString& target) {
   DhtSearch* search = new DhtSearch(target, contacts);
 
+  // - We need that to keep alive transactions that are not added till the function end.
+  //   The DhtSearch might get deleted by the transaction destructor and used afterward by
+  //   this function at the end
+  // - TODO DHT review: remove that and look into the delete at the function's end
+  std::vector<std::unique_ptr<DhtTransaction>> transactionToKeepUntilFunctionEnd;
+
   DhtSearch::const_accessor n;
-  while ((n = search->get_contact()) != search->end())
-    add_transaction(new DhtTransactionFindNode(n), packet_prio_low);
+  while ((n = search->get_contact()) != search->end()) {
+    std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionFindNode>(n);
+    if (!add_transaction(transactionToAdd, packet_prio_low)) {
+      if (!transactionToAdd) {
+        throw internal_error("add_transaction failed to add but kept ownership");
+      }
+      transactionToKeepUntilFunctionEnd.push_back(std::move(transactionToAdd));
+    }
+  }
 
   // This shouldn't happen, it means we had no contactable nodes at all.
   if (!search->start())
@@ -243,9 +258,22 @@ void
 DhtServer::announce(const DhtBucket& contacts, const HashString& infoHash, TrackerDht* tracker) {
   DhtAnnounce* announce = new DhtAnnounce(infoHash, tracker, contacts);
 
+  // - We need that to keep alive transactions that are not added till the function end.
+  //   The DhtSearch might get deleted by the transaction destructor and used afterward by
+  //   this function at the end
+  // - TODO DHT review: remove that and look into the delete at the function's end
+  std::vector<std::unique_ptr<DhtTransaction>> transactionToKeepUntilFunctionEnd;
+
   DhtSearch::const_accessor n;
-  while ((n = announce->get_contact()) != announce->end())
-    add_transaction(new DhtTransactionFindNode(n), packet_prio_high);
+  while ((n = announce->get_contact()) != announce->end()) {
+    std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionFindNode>(n);
+    if (!add_transaction(transactionToAdd, packet_prio_high)) {
+      if (!transactionToAdd) {
+        throw internal_error("add_transaction failed to add but kept ownership");
+      }
+      transactionToKeepUntilFunctionEnd.push_back(std::move(transactionToAdd));
+    }
+  }
 
   // This can only happen if all nodes we know are bad.
   if (!announce->start())
@@ -475,12 +503,11 @@ DhtServer::parse_get_peers_reply(DhtTransactionGetPeers* transaction, const DhtM
   if (response[key_r_values].is_raw_list())
     announce->receive_peers(response[key_r_values].as_raw_list());
 
-  if (response[key_r_token].is_raw_string())
-    add_transaction(new DhtTransactionAnnouncePeer(transaction->id(),
-                                                   transaction->address(),
-                                                   announce->target(),
-                                                   response[key_r_token].as_raw_string()),
-                    packet_prio_low);
+  if (response[key_r_token].is_raw_string()) {
+    std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionAnnouncePeer>(
+      transaction->id(), transaction->address(), announce->target(), response[key_r_token].as_raw_string());
+    add_transaction(transactionToAdd, packet_prio_low);
+  }
 
   announce->update_status();
 }
@@ -491,9 +518,22 @@ DhtServer::find_node_next(DhtTransactionSearch* transaction) {
   if (transaction->search()->is_announce())
     priority = packet_prio_high;
 
+  // - We need that to keep alive transactions that are not added till the function end.
+  //   The DhtSearch might get deleted by the transaction destructor and used afterward by
+  //   this function at the end
+  // - TODO DHT review: remove that and look into the delete at the function's end
+  std::vector<std::unique_ptr<DhtTransaction>> transactionToKeepUntilFunctionEnd;
+
   DhtSearch::const_accessor node;
-  while ((node = transaction->search()->get_contact()) != transaction->search()->end())
-    add_transaction(new DhtTransactionFindNode(node), priority);
+  while ((node = transaction->search()->get_contact()) != transaction->search()->end()) {
+    std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionFindNode>(node);
+    if (!add_transaction(transactionToAdd, priority)) {
+      if (!transactionToAdd) {
+        throw internal_error("add_transaction failed to add but kept ownership");
+      }
+      transactionToKeepUntilFunctionEnd.push_back(std::move(transactionToAdd));
+    }
+  }
 
   if (!transaction->search()->is_announce())
     return;
@@ -502,8 +542,15 @@ DhtServer::find_node_next(DhtTransactionSearch* transaction) {
   if (announce->complete()) {
     // We have found the 8 closest nodes to the info hash. Retrieve peers
     // from them and announce to them.
-    for (node = announce->start_announce(); node != announce->end(); ++node)
-      add_transaction(new DhtTransactionGetPeers(node), packet_prio_high);
+    for (node = announce->start_announce(); node != announce->end(); ++node) {
+    std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionGetPeers>(node);
+      if (!add_transaction(transactionToAdd, packet_prio_high)) {
+        if (!transactionToAdd) {
+          throw internal_error("add_transaction failed to add but kept ownership");
+        }
+        transactionToKeepUntilFunctionEnd.push_back(std::move(transactionToAdd));
+    }
+    }
   }
 
   announce->update_status();
@@ -612,8 +659,8 @@ DhtServer::create_error(const DhtMessage& req, const rak::socket_address* sa, in
   add_packet(new DhtTransactionPacket(sa, error), packet_prio_reply);
 }
 
-int
-DhtServer::add_transaction(DhtTransaction* transaction, int priority) {
+bool
+DhtServer::add_transaction(std::unique_ptr<DhtTransaction>& transaction, int priority) {
   // Try random transaction ID. This is to make it less likely that we reuse
   // a transaction ID from an earlier transaction which timed out and we forgot
   // about it, so that if the node replies after the timeout it's less likely
@@ -635,8 +682,8 @@ DhtServer::add_transaction(DhtTransaction* transaction, int priority) {
 
     // Give up after trying all possible IDs. This should never happen.
     if (id == rnd) {
-      delete transaction;
-      return -1;
+      LT_LOG_THIS("DhtServer::add_transaction failed to add transaction, something that should never happen happened ... trouble", nullptr);
+      return false;
     }
 
     // Transaction ID wrapped around, reset iterator.
@@ -645,13 +692,13 @@ DhtServer::add_transaction(DhtTransaction* transaction, int priority) {
   }
 
   // We know where to insert it, so pass that as hint.
-  insertItr = m_transactions.insert(insertItr, std::make_pair(transaction->key(id), transaction));
+  insertItr = m_transactions.insert(insertItr, std::make_pair(transaction->key(id), transaction.release()));
 
-  create_query(insertItr, id, transaction->address(), priority);
+  create_query(insertItr, id, insertItr->second->address(), priority);
 
   start_write();
 
-  return id;
+  return true;
 }
 
 // Transaction received no reply and timed out. Mark node as bad and remove

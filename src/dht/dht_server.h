@@ -39,6 +39,7 @@
 
 #include <map>
 #include <deque>
+#include <memory>
 #include <rak/priority_queue_default.h>
 #include <rak/socket_address.h>
 
@@ -158,7 +159,7 @@ private:
   void                create_get_peers_response(const DhtMessage& arg, const rak::socket_address* sa, DhtMessage& reply);
   void                create_announce_peer_response(const DhtMessage& arg, const rak::socket_address* sa, DhtMessage& reply);
 
-  int                 add_transaction(DhtTransaction* t, int priority);
+  bool                add_transaction(std::unique_ptr<DhtTransaction>& t, int priority);
 
   // This returns the iterator after the given one or end()
   transaction_itr     failed_transaction(transaction_itr itr, bool quick);
