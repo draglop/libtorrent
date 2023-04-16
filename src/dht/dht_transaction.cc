@@ -282,6 +282,10 @@ DhtTransaction::~DhtTransaction() {
 
 void
 DhtTransactionSearch::set_stalled() {
+  if (m_search == nullptr) {
+    throw internal_error("DhtTransactionSearch::set_stalled called while search was unset.");
+  }
+
   if (!m_hasQuickTimeout)
     throw internal_error("DhtTransactionSearch::set_stalled called on already stalled transaction.");
 
@@ -305,11 +309,24 @@ DhtTransactionSearch::complete(bool success) {
 }
 
 DhtTransactionSearch::~DhtTransactionSearch() {
-  if (m_node != m_search->end())
+  if (!is_complete())
     complete(false);
 
-  if (m_search->complete())
+  if (m_search && m_search->complete())
     delete m_search;
+}
+
+bool
+DhtTransactionSearch::is_complete() const {
+  return !m_search || m_node == m_search->end();
+}
+
+void
+DhtTransactionSearch::forget_search_HACK() {
+  if (!is_complete()) {
+    throw internal_error("DhtTransactionSearch::forget_search_HACK called for incomplete transaction.");
+  }
+  m_search = nullptr;
 }
 
 }

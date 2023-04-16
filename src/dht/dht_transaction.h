@@ -343,6 +343,16 @@ public:
   void                       set_stalled();
 
   void                       complete(bool success);
+  bool                       is_complete() const;
+
+  // TODO DHT refactor
+  // - hack to prevent a double free
+  // - it removes the responsabilty to delete the DhtSearch from this transaction
+  //   it should be called when the transaction has released its 'reference count' (m_pending) to the search and that
+  //   new transactions are being spawn
+  // - the double free occurs when all the new transactions are destroyed before the destruction of this instance
+  //   that is the case when all the spawned transactions fail to be added by the DhtServer
+  void                       forget_search_HACK();
 
 protected: 
   DhtTransactionSearch(int quick_timeout, int timeout, DhtSearch::const_accessor& node)

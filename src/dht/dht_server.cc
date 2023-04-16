@@ -524,9 +524,11 @@ DhtServer::find_node_next(DhtTransactionSearch* transaction) {
   // - TODO DHT review: remove that and look into the delete at the function's end
   std::vector<std::unique_ptr<DhtTransaction>> transactionToKeepUntilFunctionEnd;
 
+  bool has_new_transactions = false;
   DhtSearch::const_accessor node;
   while ((node = transaction->search()->get_contact()) != transaction->search()->end()) {
     std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionFindNode>(node);
+    has_new_transactions = true;
     if (!add_transaction(transactionToAdd, priority)) {
       if (!transactionToAdd) {
         throw internal_error("add_transaction failed to add but kept ownership");
@@ -535,22 +537,31 @@ DhtServer::find_node_next(DhtTransactionSearch* transaction) {
     }
   }
 
-  if (!transaction->search()->is_announce())
+  if (!transaction->search()->is_announce()) {
+    if (has_new_transactions && transaction->is_complete()) {
+      transaction->forget_search_HACK();
+    }
     return;
+  }
 
   DhtAnnounce* announce = static_cast<DhtAnnounce*>(transaction->search());
   if (announce->complete()) {
     // We have found the 8 closest nodes to the info hash. Retrieve peers
     // from them and announce to them.
     for (node = announce->start_announce(); node != announce->end(); ++node) {
-    std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionGetPeers>(node);
+      has_new_transactions = true;
+      std::unique_ptr<DhtTransaction> transactionToAdd = std::make_unique<DhtTransactionGetPeers>(node);
       if (!add_transaction(transactionToAdd, packet_prio_high)) {
         if (!transactionToAdd) {
           throw internal_error("add_transaction failed to add but kept ownership");
         }
         transactionToKeepUntilFunctionEnd.push_back(std::move(transactionToAdd));
+      }
     }
-    }
+  }
+
+  if (has_new_transactions && transaction->is_complete()) {
+    transaction->forget_search_HACK();
   }
 
   announce->update_status();
