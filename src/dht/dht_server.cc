@@ -896,9 +896,6 @@ DhtServer::process_queue(packet_queue& queue, uint32_t* quota) {
 
   while (!queue.empty()) {
     DhtTransactionPacket* packet = queue.front();
-    DhtTransaction::key_type transactionKey = 0;
-    if(packet->has_transaction())
-      transactionKey = packet->transaction()->key(packet->id());
 
     // Make sure its transaction hasn't timed out yet, if it has/had one
     // and don't bother sending non-transaction packets (replies) after 
@@ -919,34 +916,25 @@ DhtServer::process_queue(packet_queue& queue, uint32_t* quota) {
 
     queue.pop_front();
 
-    try {
-      int written = write_datagram(packet->c_str(), packet->length(), packet->address());
+    const int written = write_datagram(packet->c_str(), packet->length(), packet->address());
 
-      if (written == -1)
-        throw network_error();
-
+    if (written != -1) {
       used += written;
       *quota -= written;
-
-      if ((unsigned int)written != packet->length())
-        throw network_error();
-
-    } catch (network_error& e) {
-      // Couldn't write packet, maybe something wrong with node address or routing, so mark node as bad.
-      if (packet->has_transaction()) {
-        transaction_itr itr = m_transactions.find(transactionKey);
-        if (itr == m_transactions.end())
-          throw internal_error("DhtServer::process_queue could not find transaction.");
-
-        failed_transaction(itr, false);
-      }
     }
+    const bool failed = written == -1 || (size_t)written != packet->length();
 
     if (packet->has_transaction()) {
-      // here transaction can be already deleted by failed_transaction.
-      transaction_itr itr = m_transactions.find(transactionKey);
-      if (itr != m_transactions.end())
-        packet->transaction()->set_packet(NULL);
+      const DhtTransaction::key_type transactionKey = packet->transaction()->key(packet->id());
+      const transaction_itr itr = m_transactions.find(transactionKey);
+      if (itr == m_transactions.end()) {
+          throw internal_error("DhtServer::process_queue could not find transaction.");
+      }
+      if (!failed) {
+        packet->transaction()->set_packet(nullptr);
+      } else {
+        failed_transaction(itr, false);
+      }
     }
 
     delete packet;
