@@ -248,8 +248,8 @@ public:
   ~DhtTransactionPacket()                               { delete[] m_data; }
 
   bool                        has_transaction() const   { return m_id >= -1; }
-  bool                        has_failed() const        { return m_id == -1; }
-  void                        set_failed()              { m_id = -1; }
+  bool                        has_invalid_transaction() const        { return m_id == -1; }
+  void                        set_transaction_invalid()              { m_id = -1; m_transaction = nullptr; }
 
   const rak::socket_address*  address() const           { return &m_sa; }
   rak::socket_address*        address()                 { return &m_sa; }

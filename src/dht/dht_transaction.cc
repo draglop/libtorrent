@@ -277,7 +277,7 @@ DhtTransaction::DhtTransaction(int quick_timeout, int timeout, const HashString&
 
 DhtTransaction::~DhtTransaction() {
   if (m_packet != NULL)
-    m_packet->set_failed();
+    m_packet->set_transaction_invalid();
 }
 
 void

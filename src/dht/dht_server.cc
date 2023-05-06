@@ -903,7 +903,10 @@ DhtServer::process_queue(packet_queue& queue, uint32_t* quota) {
     // Make sure its transaction hasn't timed out yet, if it has/had one
     // and don't bother sending non-transaction packets (replies) after 
     // more than 15 seconds in the queue.
-    if (packet->has_failed() || packet->age() > 15) {
+    if (packet->has_invalid_transaction() || packet->age() > 15) {
+      if (packet->transaction() != nullptr) {
+        throw internal_error("DhtServer::process_queue deleting packet that has a transaction");
+      }
       delete packet;
       queue.pop_front();
       continue;
