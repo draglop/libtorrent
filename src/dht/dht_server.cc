@@ -300,6 +300,8 @@ DhtServer::cancel_announce(DownloadInfo* info, const TrackerDht* tracker) {
 
     ++itr;
   }
+
+  check_write();
 }
 
 void
@@ -1002,6 +1004,14 @@ DhtServer::receive_timeout() {
   }
 
   start_write();
+  check_write();
+}
+
+void
+DhtServer::check_write() {
+  if (m_highQueue.empty() && m_lowQueue.empty()) {
+    manager->poll()->remove_write(this);
+  }
 }
 
 }

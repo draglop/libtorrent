@@ -138,6 +138,7 @@ private:
   static const int packet_prio_low   = 1;  // For (relatively) unimportant queries we send.
   static const int packet_prio_reply = 0;  // For replies to peer queries.
 
+  void                check_write();
   void                start_write();
 
   void                process_query(const HashString& id, const rak::socket_address* sa, const DhtMessage& req);
