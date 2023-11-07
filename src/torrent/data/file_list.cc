@@ -674,18 +674,25 @@ FileList::mark_completed(uint32_t index) {
 
 FileList::iterator
 FileList::inc_completed(iterator firstItr, uint32_t index) {
-  firstItr         = std::find_if(firstItr, end(), rak::less(index, std::mem_fn(&File::range_second)));
-  iterator lastItr = std::find_if(firstItr, end(), rak::less(index + 1, std::mem_fn(&File::range_second)));
+  // File::range_second refers last piece index + 1
+  // TODO range refactor to only list pieces that are part of the file
+  firstItr = std::find_if(firstItr, end(), [index] (const torrent::File* file)
+  {
+    return index >= file->range_first() && index < file->range_second();
+  });
 
   if (firstItr == end())
     throw internal_error("FileList::inc_completed() first == m_entryList->end().", data()->hash());
 
-  // TODO: Check if this works right for zero-length files.
-  std::for_each(firstItr,
-                lastItr == end() ? end() : (lastItr + 1),
-                std::mem_fn(&File::inc_completed_protected));
+  iterator lastItr = std::find_if(firstItr, end(), [index] (const torrent::File* file)
+  {
+    return file->range_first() > index;
+  });
 
-  return lastItr;
+  // TODO: Check if this works right for zero-length files.
+  std::for_each(firstItr, lastItr, std::mem_fn(&File::inc_completed_protected));
+
+  return firstItr;
 }
 
 void
