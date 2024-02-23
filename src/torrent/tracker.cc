@@ -38,10 +38,15 @@
 
 #include <algorithm>
 
+#include "download_info.h"
 #include "exceptions.h"
 #include "globals.h"
 #include "tracker.h"
 #include "tracker_list.h"
+#include "utils/log.h"
+
+#define LT_LOG_TRACKER(log_level, log_fmt, ...)                         \
+  lt_log_print_info(LOG_TRACKER_##log_level, m_parent->info(), "tracker", log_fmt, __VA_ARGS__);
 
 namespace torrent {
 
@@ -81,6 +86,8 @@ Tracker::enable() {
   if (is_enabled())
     return;
 
+  LT_LOG_TRACKER(INFO, "enabling [%s]", m_url.c_str());
+
   m_flags |= flag_enabled;
   
   if (m_parent->slot_tracker_enabled())
@@ -91,6 +98,8 @@ void
 Tracker::disable() {
   if (!is_enabled())
     return;
+
+  LT_LOG_TRACKER(INFO, "disabling [%s]", m_url.c_str());
 
   close();
   m_flags &= ~flag_enabled;
