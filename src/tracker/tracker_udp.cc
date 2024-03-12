@@ -70,7 +70,6 @@ TrackerUdp::TrackerUdp(TrackerList* parent, const std::string& url, int flags) :
 
   m_port(0),
 
-  m_slot_resolver(NULL),
   m_readBuffer(NULL),
   m_writeBuffer(NULL) {
 
@@ -78,11 +77,7 @@ TrackerUdp::TrackerUdp(TrackerList* parent, const std::string& url, int flags) :
 }
 
 TrackerUdp::~TrackerUdp() noexcept(false) {
-  if (m_slot_resolver != NULL) {
-    *m_slot_resolver = resolver_type();
-    m_slot_resolver = NULL;
-  }
-
+  // TODO this need to ensure that there's no pending dns resolve if it becomes async
   close_directly();
 }
   
@@ -105,14 +100,9 @@ TrackerUdp::send_state(int state) {
 
   m_sendState = state;
 
-  // Because we can only remember one slot, set any pending resolves blocked
-  // so that if this tracker is deleted, the member function won't be called.
-  if (m_slot_resolver != NULL) {
-    *m_slot_resolver = resolver_type();
-    m_slot_resolver = NULL;
-  }
-
-  m_slot_resolver = make_resolver_slot(hostname);
+  // resolve callback will really send the state
+  // TODO this need fixing cause resolve could become async (it's not for now)
+  resolve(hostname);
 }
 
 bool
@@ -128,8 +118,8 @@ TrackerUdp::parse_udp_url(const std::string& url, hostname_type& hostname, int& 
   return false;
 }
 
-TrackerUdp::resolver_type*
-TrackerUdp::make_resolver_slot(const hostname_type& hostname) {
+void
+TrackerUdp::resolve(const hostname_type& hostname) {
   return manager->connection_manager()->resolver()(hostname.data(), PF_UNSPEC, SOCK_DGRAM,
                                                    std::bind(&TrackerUdp::start_announce,
                                                              this,
@@ -139,11 +129,6 @@ TrackerUdp::make_resolver_slot(const hostname_type& hostname) {
 
 void
 TrackerUdp::start_announce(const sockaddr* sa, int err) {
-  if (m_slot_resolver != NULL) {
-    *m_slot_resolver = resolver_type();
-    m_slot_resolver = NULL;
-  }
-
   if (sa == NULL)
     return receive_failed("could not resolve hostname");
 

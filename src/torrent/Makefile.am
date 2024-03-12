@@ -95,6 +95,8 @@ libtorrent_torrent_la_SOURCES = \
 	connection_manager.h \
 	dht_manager.cc \
 	dht_manager.h \
+	dns_manager.cc \
+	dns_manager.h \
 	download.cc \
 	download.h \
 	download_info.h \
@@ -203,6 +205,7 @@ libtorrent_torrent_include_HEADERS = \
 	common.h \
 	connection_manager.h \
 	dht_manager.h \
+	dns_manager.h \
 	download.h \
 	download_info.h \
 	error.h \

@@ -38,10 +38,6 @@
 
 #include <sys/types.h>
 
-#ifdef HAVE_RESOLV_H
-#include <resolv.h>
-#endif
-
 #include <rak/address_info.h>
 #include <rak/socket_address.h>
 
@@ -50,84 +46,14 @@
 #include "connection_manager.h"
 #include "error.h"
 #include "exceptions.h"
+#include "globals.h"
 #include "manager.h"
 
 namespace torrent {
 
-// Fix TrackerUdp, etc, if this is made async.
-static ConnectionManager::slot_resolver_result_type*
-resolve_host_system(ConnectionManager* cm, const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
-  if (!cm->network_active_get()) {
-    slot(nullptr, 0);
-    return nullptr;
-  }
-
-  if (manager->main_thread_main()->is_current())
-    thread_base::release_global_lock();
-
-  rak::address_info* ai;
-  int err;
-
-  if ((err = rak::address_info::get_address_info(host, family, socktype, &ai)) != 0) {
-    if (manager->main_thread_main()->is_current())
-      thread_base::acquire_global_lock();
-
-    slot(NULL, err);
-    return NULL;
-  }
-
-  rak::socket_address sa;
-  sa.copy(*ai->address(), ai->length());
-  rak::address_info::free_address_info(ai);
-
-  if (manager->main_thread_main()->is_current())
-    thread_base::acquire_global_lock();
-
-  slot(sa.c_sockaddr(), 0);
-  return NULL;
-}
-
-#ifdef HAVE_RESOLV_H
-static ConnectionManager::slot_resolver_result_type*
-resolve_host_custom(ConnectionManager* cm, const char* host, int family, int socktype, ConnectionManager::slot_resolver_result_type slot) {
-  if (!cm->network_active_get()) {
-    slot(nullptr, 0);
-    return nullptr;
-  }
-
-  unsigned char response[NS_PACKETSZ];
-  // TODO ipv6 / T_AAAA ?
-  const int len = res_nquery(&_res, host, C_IN, T_A, response, sizeof(response));
-  if (len > -1) {
-    ns_msg handle;
-    if (ns_initparse(response, len, &handle) > -1) {
-      for (int i_msg = 0; i_msg < ns_msg_count(handle, ns_s_an); ++i_msg) {
-        ns_rr rr;
-        if (ns_parserr(&handle, ns_s_an, i_msg, &rr) == 0) {
-          if (ns_rr_type(rr) == ns_t_a) {
-            if (rr.rdlength != 4) {
-              fprintf(stderr, "unexpected rd length [%u]\n", rr.rdlength);
-              throw internal_error("Invalid rd length.");
-            }
-            const int address = ns_get32(rr.rdata);
-            struct sockaddr_in sin;
-            memset(&sin, 0x00, sizeof(sin));
-            sin.sin_addr.s_addr = address;
-            sin.sin_family = AF_INET;
-            slot(reinterpret_cast<const struct sockaddr *>(&sin), 0);
-            return nullptr;
-          }
-        }
-      }
-    }
-  }
-
-  slot(nullptr, errno);
-  return nullptr;
-}
-#endif
-
 ConnectionManager::ConnectionManager() :
+  m_dnsManager(*this),
+  m_dnsCacheTimeoutMs(1000 * 60 * 5),
   m_size(0),
   m_maxSize(0),
 
@@ -154,15 +80,21 @@ ConnectionManager::ConnectionManager() :
   rak::socket_address::cast_from(m_localAddress)->clear();
   rak::socket_address::cast_from(m_proxyAddress)->clear();
 
-  m_slot_resolver = std::bind(&resolve_host_system,
-                              this,
+  m_slot_resolver = std::bind(&DnsManager::resolve,
+                              &m_dnsManager,
                               std::placeholders::_1,
                               std::placeholders::_2,
                               std::placeholders::_3,
                               std::placeholders::_4);
+
+  m_dnsCacheTimer.slot() = std::bind(&ConnectionManager::dns_cache_clear, this);
+
+  dns_cache_clear_schedule();
 }
 
 ConnectionManager::~ConnectionManager() {
+  priority_queue_erase(&taskScheduler, &m_dnsCacheTimer);
+
   delete m_listen;
 
   delete m_bindAddress;
@@ -202,39 +134,6 @@ ConnectionManager::set_bind_address(const sockaddr* sa) {
     throw input_error("Tried to set a bind address that is not an af_inet address.");
 
   rak::socket_address::cast_from(m_bindAddress)->copy(*rsa, rsa->length());
-}
-
-void
-ConnectionManager::dns_server_set(const sockaddr* sa) {
-#ifdef HAVE_RESOLV_H
-  if (sa && sa->sa_family != AF_INET) {
-      throw input_error("Tried to set a custom dns server that is not ipv4.");
-  }
-
-  const int r = res_ninit(&_res);
-  if (r != 0) {
-    fprintf(stderr, "Failed to res_init, error code: [%d]", r);
-    throw internal_error("Failed to res_init.");
-  }
-
-  sockaddr_in sin;
-  memcpy(&sin, sa, sizeof(sockaddr_in));
-  if (sin.sin_port == 0) {
-    sin.sin_port = htons(53);
-  }
-
-  memcpy(&_res.nsaddr_list[0], &sin, sizeof(sockaddr_in));
-  _res.nscount = 1;
-
-  m_slot_resolver = std::bind(&resolve_host_custom,
-                              this,
-                              std::placeholders::_1,
-                              std::placeholders::_2,
-                              std::placeholders::_3,
-                              std::placeholders::_4);
-#else
-  throw internal_error("Can't set custom DNS server, it was compiled out.");
-#endif
 }
 
 void
@@ -289,6 +188,32 @@ ConnectionManager::set_listen_backlog(int v) {
     throw input_error("backlog value must be set before listen port is opened");
 
   m_listen_backlog = v;
+}
+
+void
+ConnectionManager::dns_cache_clear() {
+  m_dnsManager.cache_clear();
+  dns_cache_clear_schedule();
+}
+
+void
+ConnectionManager::dns_cache_clear_intervale_ms_set(uint32_t ms) {
+  m_dnsCacheTimeoutMs = ms;
+  dns_cache_clear();
+}
+
+void
+ConnectionManager::dns_cache_clear_schedule() {
+  priority_queue_erase(&taskScheduler, &m_dnsCacheTimer);
+  if (m_dnsCacheTimeoutMs > 0) {
+    const rak::timer next_timeout = cachedTime + rak::timer::from_milliseconds(m_dnsCacheTimeoutMs);
+    priority_queue_insert(&taskScheduler, &m_dnsCacheTimer, next_timeout);
+  }
+}
+
+void
+ConnectionManager::dns_server_set(const sockaddr* sa) {
+  m_dnsManager.server_set(sa);
 }
 
 }

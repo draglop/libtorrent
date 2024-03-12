@@ -47,6 +47,9 @@
 #include <netinet/ip.h>
 #include <sys/socket.h>
 #include <torrent/common.h>
+#include <torrent/dns_manager.h>
+
+#include "rak/priority_queue_default.h"
 
 namespace torrent {
 
@@ -101,8 +104,7 @@ public:
   typedef std::function<ThrottlePair (const sockaddr*)> slot_throttle_type;
 
   // The sockaddr argument in the result slot call is NULL if the resolve failed, and the int holds the errno.
-  typedef std::function<void (const sockaddr*, int)> slot_resolver_result_type;
-  typedef std::function<slot_resolver_result_type* (const char*, int, int, slot_resolver_result_type)> slot_resolver_type;
+  typedef std::function<void (const char*, int, int, DnsManager::resolve_result_callback_type)> slot_resolver_type;
 
   ConnectionManager();
   ~ConnectionManager();
@@ -141,6 +143,8 @@ public:
   void                set_proxy_address(const sockaddr* sa);
 
   void                dns_server_set(const sockaddr* sa);
+  void                dns_cache_clear();
+  void                dns_cache_clear_intervale_ms_set(uint32_t);
 
   uint32_t            filter(const sockaddr* sa);
   void                set_filter(const slot_filter_type& s)   { m_slot_filter = s; }
@@ -184,6 +188,12 @@ public:
 private:
   ConnectionManager(const ConnectionManager&);
   void operator = (const ConnectionManager&);
+
+  void                dns_cache_clear_schedule();
+
+  DnsManager          m_dnsManager;
+  rak::priority_item  m_dnsCacheTimer;
+  uint32_t            m_dnsCacheTimeoutMs;
 
   size_type           m_size;
   size_type           m_maxSize;

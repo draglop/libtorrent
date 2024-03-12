@@ -202,6 +202,7 @@ const char* option_list_log_group[] = {
   "connection_filter",
   "connection_hanshake",
   "connection_listen",
+  "connection_dns",
 
   "dht_all",
   "dht_manager",
