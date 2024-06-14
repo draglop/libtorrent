@@ -48,7 +48,34 @@
 #define LT_LOG_TRACKER(log_level, log_fmt, ...)                         \
   lt_log_print_info(LOG_TRACKER_##log_level, m_parent->info(), "tracker", log_fmt, __VA_ARGS__);
 
+#include "manager.h"
+
+#include "torrent/connection_manager.h"
+
 namespace torrent {
+
+bool
+Tracker::is_protocol_enabled(torrent::Tracker::Type tracker_type) {
+  bool enabled = false;
+
+  switch (tracker_type) {
+    case TRACKER_HTTP:
+      enabled = manager->connection_manager()->protocol_enabled_get(ConnectionManager::protocol_t::http);
+      break;
+    case TRACKER_UDP:
+      enabled = manager->connection_manager()->protocol_enabled_get(ConnectionManager::protocol_t::udp);
+      break;
+    case TRACKER_DHT:
+      enabled = manager->connection_manager()->protocol_enabled_get(ConnectionManager::protocol_t::dht);
+      break;
+    case TRACKER_NONE:
+      enabled = false; // TODO assert?
+      break;
+  }
+
+  return enabled;
+}
+
 
 Tracker::Tracker(TrackerList* parent, const std::string& url, int flags) :
   m_flags(flags),
@@ -77,35 +104,53 @@ Tracker::Tracker(TrackerList* parent, const std::string& url, int flags) :
   m_scrape_downloaded(0),
 
   m_request_time_last(torrent::cachedTime.seconds()),
-  m_request_counter(0)
+  m_request_counter(0),
+
+  m_enabled_status(enabled_status_t::undefined)
 {
 }
 
-void
-Tracker::enable() {
-  if (is_enabled())
-    return;
+Tracker::enabled_status_t
+Tracker::enabled_status_from_int64(int64_t raw) {
+  switch (raw) {
+    case 0:
+      return enabled_status_t::off;
+      break;
+    case 1:
+      return enabled_status_t::on;
+      break;
+    default:
+      return enabled_status_t::undefined;
+      break;
+  }
+}
 
-  LT_LOG_TRACKER(INFO, "enabling [%s]", m_url.c_str());
-
-  m_flags |= flag_enabled;
-  
-  if (m_parent->slot_tracker_enabled())
-    m_parent->slot_tracker_enabled()(this);
+int64_t
+Tracker::enabled_status_to_int64(enabled_status_t enabled_status) {
+  return static_cast<int64_t>(enabled_status);
 }
 
 void
-Tracker::disable() {
-  if (!is_enabled())
+Tracker::set_enabled_status(enabled_status_t enabled_status) {
+  if (enabled_status == m_enabled_status)
     return;
 
-  LT_LOG_TRACKER(INFO, "disabling [%s]", m_url.c_str());
+  LT_LOG_TRACKER(INFO, "enabled status change from [%d] to [%d] for [%u] [%s]",
+    static_cast<int>(m_enabled_status), static_cast<int>(enabled_status), m_group, m_url.c_str());
 
-  close();
-  m_flags &= ~flag_enabled;
+  const enabled_status_t old = m_enabled_status;
+  m_enabled_status = enabled_status;
 
-  if (m_parent->slot_tracker_disabled())
-    m_parent->slot_tracker_disabled()(this);
+  if (m_enabled_status == enabled_status_t::off) {
+    close();
+  }
+
+  m_parent->receive_tracker_enabled_change(this, old, m_enabled_status);
+}
+
+Tracker::enabled_status_t
+Tracker::get_enabled_status() const {
+  return m_enabled_status;
 }
 
 uint32_t

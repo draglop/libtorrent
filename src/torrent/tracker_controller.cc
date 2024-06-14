@@ -333,10 +333,10 @@ TrackerController::start_requesting() {
 
   m_flags |= flag_requesting;
 
+  LT_LOG_TRACKER(INFO, "start requesting [flags: 0x%X].", m_flags);
+
   if ((m_flags & flag_active))
     update_timeout(0);
-
-  LT_LOG_TRACKER(INFO, "Start requesting.", 0);
 }
 
 void
@@ -346,7 +346,7 @@ TrackerController::stop_requesting() {
 
   m_flags &= ~flag_requesting;
 
-  LT_LOG_TRACKER(INFO, "Stop requesting.", 0);
+  LT_LOG_TRACKER(INFO, "stop requesting [flags: 0x%X].", m_flags);
 }
 
 uint32_t
@@ -408,11 +408,15 @@ tracker_next_timeout_promiscuous(Tracker* tracker) {
 }
 
 TrackerList::iterator
-tracker_find_preferred(TrackerList::iterator first, TrackerList::iterator last, uint32_t* next_timeout) {
+tracker_find_preferred(TrackerList &tracker_list, TrackerList::iterator first, TrackerList::iterator last, uint32_t* next_timeout) {
   TrackerList::iterator preferred = last;
   uint32_t preferred_time_last = ~uint32_t();
 
   for (; first != last; first++) {
+    if (!tracker_list.is_usable(*first)) {
+      continue;
+    }
+
     uint32_t tracker_timeout = tracker_next_timeout_promiscuous(*first);
 
     if (tracker_timeout != 0) {
@@ -461,10 +465,10 @@ TrackerController::do_timeout() {
       TrackerList::iterator group_end = m_tracker_list->end_group((*itr)->group());
       TrackerList::iterator preferred = itr;
 
-      if (!(*itr)->is_usable() || (*itr)->failed_counter()) {
+      if (!m_tracker_list->is_usable(*itr) || (*itr)->failed_counter()) {
         // The selected tracker in the group is either disabled or not
         // reachable, try the others to find a new one to use.
-        preferred = tracker_find_preferred(preferred, group_end, &next_timeout);
+        preferred = tracker_find_preferred(*m_tracker_list, preferred, group_end, &next_timeout);
 
       } else {
         uint32_t tracker_timeout = tracker_next_timeout_promiscuous(*preferred);
@@ -519,7 +523,7 @@ TrackerController::do_scrape() {
       TrackerList::iterator group_end = m_tracker_list->end_group((*itr)->group());
 
       while (itr != group_end) {
-        if ((*itr)->can_scrape() && (*itr)->is_usable()) {
+        if ((*itr)->can_scrape() && m_tracker_list->is_usable(*itr)) {
           m_tracker_list->send_scrape(*itr);
           break;
         }

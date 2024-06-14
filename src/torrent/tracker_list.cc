@@ -87,14 +87,15 @@ TrackerList::has_active_not_scrape_in_group(uint32_t group) const {
   return std::find_if(begin_group(group), end_group(group), std::mem_fn(&Tracker::is_busy_not_scrape)) != end_group(group);
 }
 
-// Need a custom predicate because the is_usable function is virtual.
-struct tracker_usable_t : public std::function<bool (TrackerList::value_type)> {
-  bool operator () (const TrackerList::value_type& value) const { return value->is_usable(); }
-};
-
 bool
 TrackerList::has_usable() const {
-  return std::find_if(begin(), end(), tracker_usable_t()) != end();
+  for (const Tracker *tracker : *this) {
+    if (is_usable(tracker)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 unsigned int
@@ -104,7 +105,15 @@ TrackerList::count_active() const {
 
 unsigned int
 TrackerList::count_usable() const {
-  return std::count_if(begin(), end(), tracker_usable_t());
+  unsigned int count = 0;
+
+  for (const Tracker *tracker : *this) {
+    if (is_usable(tracker)) {
+      ++count;
+    }
+  }
+
+  return count;
 }
 
 void
@@ -138,7 +147,7 @@ TrackerList::clear_stats() {
 
 void
 TrackerList::send_state(Tracker* tracker, int new_event) {
-  if (!tracker->is_usable() || new_event == Tracker::EVENT_SCRAPE)
+  if (!is_usable(tracker) || new_event == Tracker::EVENT_SCRAPE)
     return;
 
   if (tracker->is_busy()) {
@@ -148,17 +157,16 @@ TrackerList::send_state(Tracker* tracker, int new_event) {
     tracker->close();
   }
 
+  LT_LOG_TRACKER(INFO, "sending [%s] to [group: %u] [url: %s]",
+    option_as_string(OPTION_TRACKER_EVENT, new_event), tracker->group(), tracker->url().c_str());
+
   tracker->send_state(new_event);
   tracker->inc_request_counter();
-
-  LT_LOG_TRACKER(INFO, "sending '%s (group:%u url:%s)",
-                 option_as_string(OPTION_TRACKER_EVENT, new_event),
-                 tracker->group(), tracker->url().c_str());
 }
 
 void
 TrackerList::send_scrape(Tracker* tracker) {
-  if (tracker->is_busy() || !tracker->is_usable())
+  if (tracker->is_busy() || !is_usable(tracker))
     return;
 
   if (!(tracker->flags() & Tracker::flag_can_scrape))
@@ -190,7 +198,7 @@ TrackerList::insert(unsigned int group, Tracker* tracker) {
 void
 TrackerList::insert_url(unsigned int group, const std::string& url, bool extra_tracker) {
   Tracker* tracker;
-  int flags = Tracker::flag_enabled;
+  int flags = 0;
 
   if (extra_tracker)
     flags |= Tracker::flag_extra_tracker;
@@ -226,7 +234,7 @@ TrackerList::find_url(const std::string& url) {
 
 TrackerList::iterator
 TrackerList::find_usable(iterator itr) {
-  while (itr != end() && !tracker_usable_t()(*itr))
+  while (itr != end() && !is_usable(*itr))
     ++itr;
 
   return itr;
@@ -234,7 +242,7 @@ TrackerList::find_usable(iterator itr) {
 
 TrackerList::const_iterator
 TrackerList::find_usable(const_iterator itr) const {
-  while (itr != end() && !tracker_usable_t()(*itr))
+  while (itr != end() && !is_usable(*itr))
     ++itr;
 
   return itr;
@@ -242,28 +250,43 @@ TrackerList::find_usable(const_iterator itr) const {
 
 TrackerList::iterator
 TrackerList::find_next_to_request(iterator itr) {
-  TrackerList::iterator preferred = itr = std::find_if(itr, end(), std::mem_fn(&Tracker::can_request_state));
+  LT_LOG_TRACKER(DEBUG, "finding next tracker to request (starting at [group: %u] [url: %s])", (*itr)->group(), (*itr)->url().c_str());
 
-  if (preferred == end() || (*preferred)->failed_counter() == 0)
-    return preferred;
+  auto can_request = [this](const Tracker* tracker) {
+    return this->is_usable(tracker) && tracker->can_request_state();
+  };
 
-  while (++itr != end()) {
-    if (!(*itr)->can_request_state())
-      continue;
-
-    if ((*itr)->failed_counter() != 0) {
-      if ((*itr)->failed_time_next() < (*preferred)->failed_time_next())
-        preferred = itr;
-
-    } else {
-      if ((*itr)->success_time_next() < (*preferred)->failed_time_next())
-        preferred = itr;
-
+  for (; itr != end(); ++itr) {
+    if (can_request(*itr)) {
       break;
     }
   }
 
-  return preferred;
+  if (itr != end() && (*itr)->failed_counter() != 0) {
+    // found one that has error, try to find a better one
+    for (TrackerList::iterator better_candidate = itr + 1; better_candidate != end(); ++better_candidate) {
+      if (!can_request(*better_candidate)) {
+        continue;
+      }
+
+      if ((*better_candidate)->failed_counter() != 0) {
+        if ((*better_candidate)->failed_time_next() < (*itr)->failed_time_next()) {
+          itr = better_candidate;
+        }
+      } else {
+        if ((*better_candidate)->success_time_next() < (*itr)->failed_time_next()) {
+          itr = better_candidate;
+        }
+
+        break;
+      }
+    }
+  }
+
+  LT_LOG_TRACKER(DEBUG, "next tracker to request [group: %d] [url: %s])",
+    itr != end() ? (*itr)->group() : -1,  itr != end() ? (*itr)->url().c_str() : "");
+
+  return itr;
 }
 
 TrackerList::iterator
@@ -319,6 +342,34 @@ TrackerList::randomize_group_entries() {
     std::shuffle(itr, tmp, g);
 
     itr = tmp;
+  }
+}
+
+void
+TrackerList::receive_tracker_enabled_change(Tracker* tracker, Tracker::enabled_status_t previous, Tracker::enabled_status_t current) {
+  LT_LOG_TRACKER(DEBUG, "receiving tracker enabled change [old: %d] [new: %d] for [group: %u] [url: %s]",
+     static_cast<int>(previous), static_cast<int>(current), tracker->group(), tracker->url().c_str());
+
+  const bool protocol_is_on = Tracker::is_protocol_enabled(tracker->type());
+  const bool tracker_was_on = (previous == Tracker::enabled_status_t::on) ||
+    ((previous == Tracker::enabled_status_t::undefined) && protocol_is_on);
+  const bool tracker_is_on = (current == Tracker::enabled_status_t::on) ||
+    ((current == Tracker::enabled_status_t::undefined) && protocol_is_on);
+
+  if (tracker_was_on && (current == Tracker::enabled_status_t::undefined) && !protocol_is_on) {
+    tracker->close();
+  }
+
+  if (tracker_is_on != tracker_was_on) {
+    if (tracker_is_on) {
+      if (m_slot_tracker_enabled) {
+        m_slot_tracker_enabled(tracker);
+      }
+    } else {
+      if (m_slot_tracker_disabled) {
+        m_slot_tracker_disabled(tracker);
+      }
+    }
   }
 }
 
@@ -387,6 +438,27 @@ TrackerList::receive_scrape_failed(Tracker* tb, const std::string& msg) {
 
   if (m_slot_scrape_failed)
     m_slot_scrape_failed(tb, msg);
+}
+
+bool
+TrackerList::is_usable(const Tracker *tracker) const {
+  bool usable = false;
+
+  switch (tracker->get_enabled_status()) {
+    case Tracker::enabled_status_t::on:
+      usable = tracker->is_usable();
+      break;
+    case Tracker::enabled_status_t::off:
+      usable = false;
+      break;
+    case Tracker::enabled_status_t::undefined:
+      usable = Tracker::is_protocol_enabled(tracker->type()) && tracker->is_usable();
+      break;
+  }
+
+  LT_LOG_TRACKER(DEBUG, "is usable check [%s] for [group: %u] [url: %s]", usable ? "success" : "fail", tracker->group(), tracker->url().c_str());
+
+  return usable;
 }
 
 }

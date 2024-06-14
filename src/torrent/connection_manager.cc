@@ -66,6 +66,8 @@ ConnectionManager::ConnectionManager() :
   m_listen_port(0),
   m_listen_backlog(SOMAXCONN),
 
+  m_protocols_enabled(0xFFFFFFFF),
+
   m_block_ipv4(false),
   m_block_ipv6(false),
   m_prefer_ipv6(false),
@@ -214,6 +216,20 @@ ConnectionManager::dns_cache_clear_schedule() {
 void
 ConnectionManager::dns_server_set(const sockaddr* sa) {
   m_dnsManager.server_set(sa);
+}
+
+bool
+ConnectionManager::protocol_enabled_get(protocol_t protocol) const {
+  return m_protocols_enabled & static_cast<uint32_t>(protocol);
+}
+
+void
+ConnectionManager::protocol_enabled_set(protocol_t protocol, bool enabled) {
+  if (enabled) {
+    m_protocols_enabled |= static_cast<uint32_t>(protocol);
+  } else {
+    m_protocols_enabled &= ~static_cast<uint32_t>(protocol);
+  }
 }
 
 }

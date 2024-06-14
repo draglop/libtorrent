@@ -553,11 +553,11 @@ resume_load_tracker_settings(Download download, const Object& object) {
 
     const Object& trackerObject = src.get_key((*itr)->url());
 
-    if (trackerObject.has_key_value("enabled") && trackerObject.get_key_value("enabled") == 0)
-      (*itr)->disable();
-    else
-      (*itr)->enable();
-  }    
+    if (trackerObject.has_key_value("enabled")) {
+      const Tracker::enabled_status_t enabled_status = torrent::Tracker::enabled_status_from_int64(trackerObject.get_key_value("enabled"));
+      (*itr)->set_enabled_status(enabled_status);
+    }
+  }
 }
 
 void
@@ -568,7 +568,10 @@ resume_save_tracker_settings(Download download, Object& object) {
   for (TrackerList::iterator itr = tracker_list->begin(), last = tracker_list->end(); itr != last; ++itr) {
     Object& trackerObject = dest.insert_key((*itr)->url(), Object::create_map());
 
-    trackerObject.insert_key("enabled", Object((int64_t)(*itr)->is_enabled()));
+    const Tracker::enabled_status_t enable_status = (*itr)->get_enabled_status();
+    if (enable_status != Tracker::enabled_status_t::undefined) {
+      trackerObject.insert_key("enabled", Object(Tracker::enabled_status_to_int64(enable_status)));
+    }
 
     if ((*itr)->is_extra_tracker()) {
       trackerObject.insert_key("extra_tracker", Object((int64_t)1));

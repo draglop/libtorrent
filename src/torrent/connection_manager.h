@@ -106,6 +106,12 @@ public:
   // The sockaddr argument in the result slot call is NULL if the resolve failed, and the int holds the errno.
   typedef std::function<void (const char*, int, int, DnsManager::resolve_result_callback_type)> slot_resolver_type;
 
+  enum class protocol_t {
+    http = 1 << 0,
+    udp = 1 << 1,
+    dht = 1 << 2,
+  };
+
   ConnectionManager();
   ~ConnectionManager();
   
@@ -185,6 +191,9 @@ public:
   bool                is_prefer_ipv6() const  { return m_prefer_ipv6; }
   void                set_prefer_ipv6(bool v) { m_prefer_ipv6 = v; }
 
+  void                protocol_enabled_set(protocol_t, bool enabled);
+  bool                protocol_enabled_get(protocol_t) const;
+
 private:
   ConnectionManager(const ConnectionManager&);
   void operator = (const ConnectionManager&);
@@ -214,6 +223,8 @@ private:
   slot_filter_type    m_slot_filter;
   slot_resolver_type  m_slot_resolver;
   slot_throttle_type  m_slot_address_throttle;
+
+  uint32_t            m_protocols_enabled;
 
   bool                m_block_ipv4;
   bool                m_block_ipv6;

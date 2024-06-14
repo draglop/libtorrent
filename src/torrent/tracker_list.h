@@ -42,13 +42,13 @@
 #include <string>
 #include <vector>
 #include <torrent/common.h>
+#include <torrent/tracker.h>
 
 namespace torrent {
 
 class AddressList;
 class DownloadInfo;
 class DownloadWrapper;
-class Tracker;
 
 // The tracker list will contain a list of tracker, divided into
 // subgroups. Each group must be randomized before we start. When
@@ -115,6 +115,7 @@ public:
 
   void                send_scrape(Tracker* tracker);
 
+  const DownloadInfo* info() const                            { return m_info; }
   DownloadInfo*       info()                                  { return m_info; }
   int                 state()                                 { return m_state; }
 
@@ -127,6 +128,7 @@ public:
   iterator            find(Tracker* tb)                       { return std::find(begin(), end(), tb); }
   iterator            find_url(const std::string& url);
 
+  bool                is_usable(const Tracker*) const;
   iterator            find_usable(iterator itr);
   const_iterator      find_usable(const_iterator itr) const;
 
@@ -145,6 +147,8 @@ public:
 
   void                receive_success(Tracker* tb, AddressList* l);
   void                receive_failed(Tracker* tb, const std::string& msg);
+
+  void                receive_tracker_enabled_change(Tracker*, Tracker::enabled_status_t previous, Tracker::enabled_status_t current);
 
   void                receive_scrape_success(Tracker* tb);
   void                receive_scrape_failed(Tracker* tb, const std::string& msg);

@@ -78,7 +78,7 @@ TrackerDht::is_busy() const {
 
 bool
 TrackerDht::is_usable() const {
-  return is_enabled() && manager->dht_manager()->is_active();
+  return Tracker::is_usable() && manager->dht_manager()->is_active();
 }
 
 void

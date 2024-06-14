@@ -29,31 +29,40 @@ public:
     EVENT_SCRAPE
   };
 
-  static const int flag_enabled = 0x1;
+  enum class enabled_status_t {
+    off,
+    on,
+    undefined,
+  };
+
   static const int flag_extra_tracker = 0x2;
   static const int flag_can_scrape = 0x4;
 
   static const int max_flag_size   = 0x10;
   static const int mask_base_flags = 0x10 - 1;
 
+  static enabled_status_t enabled_status_from_int64(int64_t);
+  static int64_t          enabled_status_to_int64(enabled_status_t);
+
+  static bool             is_protocol_enabled(Type);
+
   virtual ~Tracker() noexcept(false) {}
 
   int                 flags() const { return m_flags; }
 
-  bool                is_enabled() const        { return (m_flags & flag_enabled); }
   bool                is_extra_tracker() const  { return (m_flags & flag_extra_tracker); }
-  bool                is_in_use() const         { return is_enabled() && m_success_counter != 0; }
+  bool                is_in_use() const         { return is_usable() && m_success_counter != 0; }
 
   bool                can_scrape() const        { return (m_flags & flag_can_scrape); }
 
   virtual bool        is_busy() const = 0;
   bool                is_busy_not_scrape() const { return m_latest_event != EVENT_SCRAPE && is_busy(); }
-  virtual bool        is_usable() const          { return is_enabled(); }
+  virtual bool        is_usable() const          { return m_enabled_status != enabled_status_t::off; }
 
   bool                can_request_state() const;
 
-  void                enable();
-  void                disable();
+  void                set_enabled_status(enabled_status_t);
+  enabled_status_t    get_enabled_status() const;
 
   TrackerList*        parent()                              { return m_parent; }
 
@@ -147,6 +156,8 @@ protected:
   // there's been in the recent past.
   uint32_t            m_request_time_last;
   uint32_t            m_request_counter;
+
+  enabled_status_t    m_enabled_status;
 };
 
 inline bool
