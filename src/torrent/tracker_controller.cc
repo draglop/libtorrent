@@ -63,6 +63,8 @@ struct tracker_controller_private {
 
 void
 TrackerController::update_timeout(uint32_t seconds_to_next) {
+  LT_LOG_TRACKER(DEBUG, "next update [%u seconds]", seconds_to_next);
+
   if (!(m_flags & flag_active))
     throw internal_error("TrackerController cannot set timeout when inactive.");
 
@@ -133,6 +135,7 @@ TrackerController::seconds_to_next_scrape() const {
 
 void
 TrackerController::manual_request(bool request_now) {
+  LT_LOG_TRACKER(INFO, "manual request [already requesting: %d]", !m_private->task_timeout.is_queued());
   if (!m_private->task_timeout.is_queued())
     return;
 
