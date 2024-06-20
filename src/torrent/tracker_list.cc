@@ -250,7 +250,7 @@ TrackerList::find_usable(const_iterator itr) const {
 
 TrackerList::iterator
 TrackerList::find_next_to_request(iterator itr) {
-  LT_LOG_TRACKER(DEBUG, "finding next tracker to request (starting at [group: %u] [url: %s])", (*itr)->group(), (*itr)->url().c_str());
+  LT_LOG_TRACKER(DEBUG, "finding next tracker to request: starting at [group: %u] [url: %s]", (*itr)->group(), (*itr)->url().c_str());
 
   auto can_request = [this](const Tracker* tracker) {
     return this->is_usable(tracker) && tracker->can_request_state();
@@ -279,6 +279,20 @@ TrackerList::find_next_to_request(iterator itr) {
         }
 
         break;
+      }
+    }
+  } else if ((*itr)->activity_time_last() != 0) {
+    // tracker was already used
+    //  check if we have a tracker that has not beed used yet
+    //  or if there's one that should be contacted before
+    for (TrackerList::iterator better_candidate = itr + 1; better_candidate != end(); ++better_candidate) {
+      if (can_request(*better_candidate)) {
+        if ((*better_candidate)->activity_time_last() == 0) {
+          itr = better_candidate;
+          break;
+        } else if ((*better_candidate)->activity_time_next() < (*itr)->activity_time_next()) {
+          itr = better_candidate;
+        }
       }
     }
   }
@@ -387,7 +401,7 @@ TrackerList::receive_success(Tracker* tb, AddressList* l) {
   l->sort();
   l->erase(std::unique(l->begin(), l->end()), l->end());
 
-  LT_LOG_TRACKER(INFO, "received %u peers (url:%s)", l->size(), tb->url().c_str());
+  LT_LOG_TRACKER(INFO, "received [%u] peers from [group: %u] [url: %s]", l->size(), tb->group(), tb->url().c_str());
 
   tb->m_success_time_last = cachedTime.seconds();
   tb->m_success_counter++;

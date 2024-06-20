@@ -135,7 +135,9 @@ TrackerController::seconds_to_next_scrape() const {
 
 void
 TrackerController::manual_request(bool request_now) {
-  LT_LOG_TRACKER(INFO, "manual request [already requesting: %d]", !m_private->task_timeout.is_queued());
+  LT_LOG_TRACKER(INFO, "manual request [active: %d] [requesting: %d] [in progress: %d]",
+    is_active(), is_requesting(), is_active() && !m_private->task_timeout.is_queued());
+
   if (!m_private->task_timeout.is_queued())
     return;
 
@@ -308,11 +310,9 @@ TrackerController::enable(int enable_flags) {
   if (!(enable_flags & enable_dont_reset_stats))
     m_tracker_list->clear_stats();
 
-  LT_LOG_TRACKER(INFO, "Called enable with %u trackers.", m_tracker_list->size());
+  LT_LOG_TRACKER(INFO, "enabled with [%u] trackers.", m_tracker_list->size());
 
-  // Adding of the tracker requests gets done after the caller has had
-  // a chance to override the default behavior.
-  update_timeout(0);
+  start_requesting();
 }
 
 void
@@ -326,7 +326,7 @@ TrackerController::disable() {
   m_tracker_list->close_all_excluding((1 << Tracker::EVENT_STOPPED) | (1 << Tracker::EVENT_COMPLETED));
   priority_queue_erase(&taskScheduler, &m_private->task_timeout);
 
-  LT_LOG_TRACKER(INFO, "Called disable with %u trackers.", m_tracker_list->size());
+  LT_LOG_TRACKER(INFO, "disable with %u trackers.", m_tracker_list->size());
 }
 
 void
@@ -438,8 +438,16 @@ tracker_find_preferred(TrackerList &tracker_list, TrackerList::iterator first, T
 
 void
 TrackerController::do_timeout() {
-  if (!(m_flags & flag_active) || !m_tracker_list->has_usable())
+  if (!(m_flags & flag_active)) {
     return;
+  }
+
+  if (!m_tracker_list->has_usable()) {
+    // check every minute if something has changed (some trackers may become usable by protocol enablation, etc...)
+    // TODO a aignal should handle that
+    update_timeout(60);
+    return;
+  }
 
   priority_queue_erase(&taskScheduler, &m_private->task_timeout);
 
@@ -452,7 +460,7 @@ TrackerController::do_timeout() {
     return;
   }
 
-  if ((m_flags & (flag_promiscuous_mode | flag_requesting))) {
+  if ((m_flags & flag_promiscuous_mode)) {
     uint32_t next_timeout = ~uint32_t();
 
     TrackerList::iterator itr = m_tracker_list->begin();
@@ -492,18 +500,20 @@ TrackerController::do_timeout() {
       update_timeout(next_timeout);
 
   // TODO: Send for start/completed also?
-  } else {
+  } else if (is_requesting()) {
     TrackerList::iterator itr = m_tracker_list->find_next_to_request(m_tracker_list->begin());
 
     if (itr == m_tracker_list->end())
-      return;
+      return; // TODO this should probably be an assert has_usable has returned true
 
-    int32_t next_timeout = (*itr)->activity_time_next();
-
-    if (next_timeout <= cachedTime.seconds())
-      m_tracker_list->send_state_itr(itr, send_state);
-    else
-      update_timeout(next_timeout - cachedTime.seconds());
+    const int32_t current_time = cachedTime.seconds();
+    Tracker *tracker = *itr;
+    const uint32_t next_activity_time = tracker->activity_time_next();
+    if (next_activity_time <= (current_time > 0 ? static_cast<uint32_t>(current_time) : 0)) {
+      m_tracker_list->send_state(tracker, send_state);
+    } else {
+      update_timeout(next_activity_time - current_time);
+    }
   }
 
   if (m_slot_timeout)
@@ -553,11 +563,25 @@ TrackerController::receive_success(Tracker* tb, TrackerController::address_list*
   // Calculate the next timeout according to a list of in-use
   // trackers, with the first timeout as the interval.
 
-  if ((m_flags & flag_requesting))
+  if ((m_flags & flag_requesting)) {
     update_timeout(30);
-  else if (!m_tracker_list->has_active())
-    // TODO: Instead find the lowest timeout, correct timeout?
-    update_timeout(tb->normal_interval());
+  } else if (!m_tracker_list->has_active()) {
+    uint32_t next_timeout = tb->normal_interval();
+    {
+      auto itr = m_tracker_list->find(tb);
+      if (itr != m_tracker_list->end()) {
+        itr = m_tracker_list->find_next_to_request(itr);
+        if (itr != m_tracker_list->end()) {
+          if ((*itr)->activity_time_last() != 0) {
+            next_timeout = cachedTime.seconds() - (*itr)->activity_time_next();
+          } else {
+            next_timeout = 30;
+          }
+        }
+      }
+    }
+    update_timeout(next_timeout);
+  }
 
   return m_slot_success(l);
 }

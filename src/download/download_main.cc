@@ -319,14 +319,36 @@ DownloadMain::receive_tracker_success() {
 
 void
 DownloadMain::receive_tracker_request() {
-  if ((info()->is_pex_enabled() && info()->size_pex()) > 0
-      || connection_list()->size() + peer_list()->available_list()->size() / 2 >= connection_list()->min_size()) {
+  const bool should_request =  connection_list()->size() + (peer_list()->available_list()->size() / 2) < connection_list()->min_size();
+  // TODO make the div by 2 above a parameter (internal?)?
+  const bool is_requesting = m_tracker_controller->is_requesting();
 
-    m_tracker_controller->stop_requesting();
-    return;
+  lt_log_print_info(LOG_TRACKER_DEBUG, info(), "download",
+    "tracker controller check [should request: %d] [is requesting: %d] [connections: %zu/%zu] [peers to check: %zu]",
+      should_request, is_requesting, connection_list()->size(), connection_list()->min_size(), peer_list()->available_list()->size());
+
+  if (should_request) {
+    if (!is_requesting) {
+      lt_log_print_info(LOG_TRACKER_INFO, info(), "download",
+          "start trackers requesting [should request: %d] [is requesting: %d] [connections: %zu/%zu] [peers to check: %zu]",
+      should_request, is_requesting, connection_list()->size(), connection_list()->min_size(), peer_list()->available_list()->size());
+
+      m_tracker_controller->start_requesting();
+    }
+  } else {
+    if (is_requesting) {
+      lt_log_print_info(LOG_TRACKER_INFO, info(), "download",
+          "stopping trackers requesting [should request: %d] [is requesting: %d] [connections: %zu/%zu] [peers to check: %zu]",
+      should_request, is_requesting, connection_list()->size(), connection_list()->min_size(), peer_list()->available_list()->size());
+
+      m_tracker_controller->stop_requesting();
+    }
   }
 
-  m_tracker_controller->start_requesting();
+  // TODO should a signal handle that?
+  // this is needed cause if we stop requesting, no one cares about restarting the requests
+  priority_queue_erase(&taskScheduler, &m_taskTrackerRequest);
+  priority_queue_insert(&taskScheduler, &m_taskTrackerRequest, (cachedTime + rak::timer::from_seconds(60)).round_seconds());
 }
 
 struct SocketAddressCompact_less {
