@@ -277,7 +277,10 @@ TrackerController::send_update_event() {
 
   LT_LOG_TRACKER(INFO, "Sending update event.", 0);
 
-  m_tracker_list->send_state_itr(m_tracker_list->find_usable(m_tracker_list->begin()), Tracker::EVENT_NONE);
+  auto it = m_tracker_list->find_next_to_request(m_tracker_list->begin());
+  if (it != m_tracker_list->end()) {
+    m_tracker_list->send_state(*it, Tracker::EVENT_NONE);
+  }
 
   // if (m_tracker_list->has_active())
   //   priority_queue_erase(&taskScheduler, &m_private->task_timeout);
